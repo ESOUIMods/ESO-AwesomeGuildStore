@@ -1,7 +1,9 @@
-local L = AwesomeGuildStore.Localization
+local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
 local RegisterForEvent = AwesomeGuildStore.RegisterForEvent
 local UnregisterForEvent = AwesomeGuildStore.UnregisterForEvent
 local ToggleButton = AwesomeGuildStore.ToggleButton
+local ClearCallLater = AwesomeGuildStore.ClearCallLater
+local GetItemLinkWritCount = AwesomeGuildStore.GetItemLinkWritCount
 
 local SellTabWrapper = ZO_Object:Subclass()
 AwesomeGuildStore.SellTabWrapper = SellTabWrapper
@@ -50,6 +52,8 @@ local function CreateSlider(container, data, name)
     local container = LAMCreateControl.slider(container, data, name)
     container:SetDimensions(203, SLIDER_HEIGHT)
     container.container:SetWidth(190)
+    container.slider:SetAnchor(TOPRIGHT, nil, nil, -90)
+    container.slidervalueBG:SetWidth(90)
 
     local slider = container.slider
     slider:SetHeight(16)
@@ -173,7 +177,7 @@ function SellTabWrapper:InitializeListingInput(tradingHouseWrapper)
     self.sellPriceControl = container:GetNamedChild("SellPrice")
 
     local quantitySlider = CreateSlider(container, {
-        name = L["SELL_QUANTITY_SLIDER_LABEL"],
+        name = zo_strformat(GetString(SI_TRADING_HOUSE_POSTING_QUANTITY)) .. ":",
         getFunc = function() return self.currentStackCount end,
         setFunc = function(value)
             self:SetQuantity(value, SKIP_UPDATE_SLIDER)
@@ -183,13 +187,18 @@ function SellTabWrapper:InitializeListingInput(tradingHouseWrapper)
     quantitySlider:SetAnchor(TOPLEFT, container, TOPLEFT, 0, 0)
     self.quantitySlider = quantitySlider
 
-    local fullQuantityButton = ToggleButton:New(quantitySlider, "$(parent)FullQuantityButton", FULL_QUANTITY_TEXTURE, 0, 0, LISTING_INPUT_BUTTON_SIZE, LISTING_INPUT_BUTTON_SIZE, L["SELL_FULL_QUANTITY_BUTTON_LABEL"])
+    -- TRANSLATORS: tooltip text for the quantity selection buttons on the sell tab
+    local fullQuantityButtonLabel = gettext("Select Full Quantity")
+    local fullQuantityButton = ToggleButton:New(quantitySlider, "$(parent)FullQuantityButton", FULL_QUANTITY_TEXTURE, 0, 0, LISTING_INPUT_BUTTON_SIZE, LISTING_INPUT_BUTTON_SIZE, fullQuantityButtonLabel)
     fullQuantityButton.control:ClearAnchors()
     fullQuantityButton.control:SetAnchor(TOPRIGHT, quantitySlider, TOPRIGHT, 0, 0)
     fullQuantityButton.HandlePress = function(button)
         self:SetQuantity(self.pendingStackCount)
     end
-    local lastSoldQuantityButton = ToggleButton:New(quantitySlider, "$(parent)LastSoldQuantityButton", LAST_SOLD_QUANTITY_TEXTURE, 0, 0, LISTING_INPUT_BUTTON_SIZE, LISTING_INPUT_BUTTON_SIZE, L["SELL_LAST_QUANTITY_BUTTON_LABEL"])
+
+    -- TRANSLATORS: tooltip text for the quantity selection buttons on the sell tab
+    local lastSoldQuantityButtonLabel = gettext("Select Last Sold Quantity")
+    local lastSoldQuantityButton = ToggleButton:New(quantitySlider, "$(parent)LastSoldQuantityButton", LAST_SOLD_QUANTITY_TEXTURE, 0, 0, LISTING_INPUT_BUTTON_SIZE, LISTING_INPUT_BUTTON_SIZE, lastSoldQuantityButtonLabel)
     lastSoldQuantityButton.control:ClearAnchors()
     lastSoldQuantityButton.control:SetAnchor(RIGHT, fullQuantityButton.control, LEFT, 0, 0)
     lastSoldQuantityButton.HandlePress = function(button)
@@ -203,7 +212,8 @@ function SellTabWrapper:InitializeListingInput(tradingHouseWrapper)
     end
 
     local ppuSlider = CreateSlider(container, {
-        name = L["SELL_PPU_SLIDER_LABEL"],
+        -- TRANSLATORS: title text for the unit price selection on the sell tab
+        name = gettext("Unit Price:"),
         getFunc = function() return tonumber(string.format("%.2f", self.currentPricePerUnit)) end,
         setFunc = function(value) self:SetUnitPrice(value, SKIP_UPDATE_SLIDER) end,
         decimals = 2,
@@ -219,13 +229,18 @@ function SellTabWrapper:InitializeListingInput(tradingHouseWrapper)
     buttonContainer:SetDrawLevel(1)
     self.priceButtonContainer = buttonContainer
 
-    local defaultPriceButton = ToggleButton:New(buttonContainer, "$(parent)DefaultPriceButton", DEFAULT_PRICE_TEXTURE, 0, 0, LISTING_INPUT_BUTTON_SIZE, LISTING_INPUT_BUTTON_SIZE, L["SELL_DEFAULT_PRICE_BUTTON_LABEL"])
+    -- TRANSLATORS: tooltip text for the unit price selection buttons on the sell tab
+    local defaultPriceButtonLabel = gettext("Select Default Price")
+    local defaultPriceButton = ToggleButton:New(buttonContainer, "$(parent)DefaultPriceButton", DEFAULT_PRICE_TEXTURE, 0, 0, LISTING_INPUT_BUTTON_SIZE, LISTING_INPUT_BUTTON_SIZE, defaultPriceButtonLabel)
     defaultPriceButton.control:ClearAnchors()
     defaultPriceButton.control:SetAnchor(TOPRIGHT, buttonContainer, TOPRIGHT, 0, 0)
     defaultPriceButton.HandlePress = function(button)
         self:SetUnitPrice(self.pendingSellPrice * 3)
     end
-    local lastSellPriceButton = ToggleButton:New(buttonContainer, "$(parent)LastSellPriceButton", LAST_SELL_PRICE_TEXTURE, 0, 0, LISTING_INPUT_BUTTON_SIZE, LISTING_INPUT_BUTTON_SIZE, L["SELL_LAST_PRICE_BUTTON_LABEL"])
+
+    -- TRANSLATORS: tooltip text for the unit price selection buttons on the sell tab
+    local lastSellPriceButtonLabel = gettext("Select Last Sell Price")
+    local lastSellPriceButton = ToggleButton:New(buttonContainer, "$(parent)LastSellPriceButton", LAST_SELL_PRICE_TEXTURE, 0, 0, LISTING_INPUT_BUTTON_SIZE, LISTING_INPUT_BUTTON_SIZE, lastSellPriceButtonLabel)
     lastSellPriceButton.control:ClearAnchors()
     lastSellPriceButton.control:SetAnchor(RIGHT, defaultPriceButton.control, LEFT, 0, 0)
     lastSellPriceButton.HandlePress = function(button)
@@ -234,8 +249,11 @@ function SellTabWrapper:InitializeListingInput(tradingHouseWrapper)
             self:SetUnitPrice(lastSoldPricePerUnit)
         end
     end
+
     if(MasterMerchant) then
-        local averagePriceButton = ToggleButton:New(buttonContainer, "$(parent)AveragePriceButton", AVERAGE_PRICE_TEXTURE, 0, 0, LISTING_INPUT_BUTTON_SIZE, LISTING_INPUT_BUTTON_SIZE, L["SELL_MM_PRICE_BUTTON_LABEL"])
+        -- TRANSLATORS: tooltip text for the unit price selection buttons on the sell tab
+        local averagePriceButtonLabel = gettext("Select Master Merchant Price")
+        local averagePriceButton = ToggleButton:New(buttonContainer, "$(parent)AveragePriceButton", AVERAGE_PRICE_TEXTURE, 0, 0, LISTING_INPUT_BUTTON_SIZE, LISTING_INPUT_BUTTON_SIZE, averagePriceButtonLabel)
         averagePriceButton.control:ClearAnchors()
         averagePriceButton.control:SetAnchor(RIGHT, lastSellPriceButton.control, LEFT, 0, 0)
         averagePriceButton.HandlePress = function(button)
@@ -277,8 +295,8 @@ function SellTabWrapper:InitializeCraftingBag(tradingHouseWrapper)
     local container = tradingHouse.m_postItems:CreateControl("AwesomeGuildStoreSellTabButtons", CT_CONTROL)
     container:SetAnchor(BOTTOM, tradingHouse.m_postItems, TOP, 0, 10)
     container:SetDimensions(INVENTORY_BUTTON_SIZE * 2, INVENTORY_BUTTON_SIZE)
-    local inventoryButton = ToggleButton:New(container, "$(parent)InventoryButton", INVENTORY_TEXTURE, 0, 0, INVENTORY_BUTTON_SIZE, INVENTORY_BUTTON_SIZE, L["SELL_SELECT_INVENTORY_LABEL"], SOUNDS.MENU_BAR_CLICK)
-    local craftbagButton = ToggleButton:New(container, "$(parent)CraftingBagButton", CRAFTING_BAG_TEXTURE, INVENTORY_BUTTON_SIZE, 0, INVENTORY_BUTTON_SIZE, INVENTORY_BUTTON_SIZE, L["SELL_SELECT_CRAFTING_BAG_LABEL"], SOUNDS.MENU_BAR_CLICK)
+    local inventoryButton = ToggleButton:New(container, "$(parent)InventoryButton", INVENTORY_TEXTURE, 0, 0, INVENTORY_BUTTON_SIZE, INVENTORY_BUTTON_SIZE, zo_strformat(GetString(SI_INVENTORY_MENU_INVENTORY)), SOUNDS.MENU_BAR_CLICK)
+    local craftbagButton = ToggleButton:New(container, "$(parent)CraftingBagButton", CRAFTING_BAG_TEXTURE, INVENTORY_BUTTON_SIZE, 0, INVENTORY_BUTTON_SIZE, INVENTORY_BUTTON_SIZE, zo_strformat(GetString(SI_GAMEPAD_INVENTORY_CRAFT_BAG_HEADER)), SOUNDS.MENU_BAR_CLICK)
     inventoryButton:Press()
     inventoryButton.HandlePress = function(button)
         if(not button:IsPressed()) then
@@ -332,7 +350,7 @@ function SellTabWrapper:InitializeCraftingBag(tradingHouseWrapper)
             if(self:IsItemAlreadyBeingPosted(currentInventorySlot)) then
                 actionStringId = SI_TRADING_HOUSE_REMOVE_PENDING_POST
                 actionCallback = function()
-                    self:ClearPendingItem()
+                    self.tradingHouse:ClearPendingPost()
                     ZO_InventorySlot_OnMouseEnter(currentInventorySlot)
                 end
             else
@@ -350,63 +368,136 @@ function SellTabWrapper:InitializeCraftingBag(tradingHouseWrapper)
             self:UpdateListing()
             self.quantitySlider:UpdateValue()
             self.ppuSlider:UpdateValue()
-        elseif(self.pendingBagId == BAG_BACKPACK) then
-            self:ClearPendingItem()
+            if(self.pendingItemUpdateCallback) then
+                self.pendingItemUpdateCallback(slotId)
+            end
         end
     end)
 
-    tradingHouseWrapper:Wrap("PostPendingItem", function(originalPostPendingItem, tradingHouse)
-        if(self.requiresTempSlot) then
-            if(self.currentSellPrice <= 0) then return end
-            local eventHandle
+    local Promise = LibStub("LibPromises")
+    local TEMP_STACK_ERROR_INVALID_SELL_PRICE = 1
+    local TEMP_STACK_ERROR_INVENTORY_FULL = 2
+    local TEMP_STACK_ERROR_TIMEOUT_ON_SPLIT = 3
+    local TEMP_STACK_ERROR_TIMEOUT_ON_SET_PENDING = 4
+    local TEMP_STACK_ERROR_SLOT_DID_NOT_UPDATE = 4
+    local TEMP_STACK_ERROR_MESSAGE = {}
+    -- TRANSLATORS: error message when splitting a stack fails while trying to list an item on a store
+    TEMP_STACK_ERROR_MESSAGE[TEMP_STACK_ERROR_INVALID_SELL_PRICE] = gettext("Failed to update listing price")
+    TEMP_STACK_ERROR_MESSAGE[TEMP_STACK_ERROR_INVENTORY_FULL] = GetString(SI_INVENTORY_ERROR_INVENTORY_FULL)
+    -- TRANSLATORS: error message when splitting a stack fails while trying to list an item on a store
+    TEMP_STACK_ERROR_MESSAGE[TEMP_STACK_ERROR_TIMEOUT_ON_SPLIT] = gettext("Failed to split stack")
+    -- TRANSLATORS: error message when splitting a stack fails while trying to list an item on a store
+    TEMP_STACK_ERROR_MESSAGE[TEMP_STACK_ERROR_TIMEOUT_ON_SET_PENDING] = gettext("Failed to set stack pending")
+    -- TRANSLATORS: error message when splitting a stack fails while trying to list an item on a store
+    TEMP_STACK_ERROR_MESSAGE[TEMP_STACK_ERROR_SLOT_DID_NOT_UPDATE] = gettext("Failed to update pending slot")
+    local TEMP_STACK_WATCHDOG_TIMEOUT = 5000
+
+    local function CreateTempStack()
+        local promise = Promise:New()
+        if(self.currentSellPrice <= 0) then 
+            promise:Reject(TEMP_STACK_ERROR_INVALID_SELL_PRICE)
+        elseif(not self.tempSlot) then
+            promise:Reject(TEMP_STACK_ERROR_INVENTORY_FULL)
+        else
+            local eventHandle, timeout
+
+            local function CleanUp()
+                UnregisterForEvent(EVENT_INVENTORY_SINGLE_SLOT_UPDATE, eventHandle)
+                ClearCallLater(timeout)
+            end
+
+            timeout = zo_callLater(function()
+                CleanUp()
+                promise:Reject(TEMP_STACK_ERROR_TIMEOUT_ON_SPLIT)
+            end, TEMP_STACK_WATCHDOG_TIMEOUT)
+
             eventHandle = RegisterForEvent(EVENT_INVENTORY_SINGLE_SLOT_UPDATE, function(_, bagId, slotId, isNewItem, itemSoundCategory, inventoryUpdateReason, stackCountChange)
                 if(bagId == BAG_BACKPACK and slotId == self.tempSlot) then
-                    UnregisterForEvent(EVENT_INVENTORY_SINGLE_SLOT_UPDATE, eventHandle)
-
-                    local sellPrice = self.currentSellPrice -- save the current data before it is cleared
-                    local pricePerUnit = self.currentPricePerUnit
-                    local stackCount = self.currentStackCount
-                    EVENT_MANAGER:RegisterForEvent(POST_ITEM_PENDING_UPDATE_NAMESPACE, EVENT_TRADING_HOUSE_PENDING_ITEM_UPDATE, function(_, slotId, isPending)
-                        if(isPending) then
-                            UnregisterForEvent(EVENT_TRADING_HOUSE_PENDING_ITEM_UPDATE, POST_ITEM_PENDING_UPDATE_NAMESPACE)
-                            self.currentPricePerUnit = pricePerUnit -- no updates necessary as it is only used so the lastSold data is updated correctly
-                            self.currentStackCount = stackCount
-                            tradingHouse:SetPendingPostPrice(sellPrice, SUPPRESS_PRICE_PER_PIECE_UPDATE)
-                            tradingHouse:PostPendingItem() -- call everything from the beginning - now with the real item
-                        end
-                    end)
-
-                    SetPendingItemPost(bagId, slotId, self.currentStackCount)
+                    CleanUp()
+                    promise:Resolve()
                 end
             end)
 
-            if(self.tempSlot) then
-                MoveItem(self.pendingBagId, self.pendingSlotIndex, BAG_BACKPACK, self.tempSlot, self.currentStackCount)
+            MoveItem(self.pendingBagId, self.pendingSlotIndex, BAG_BACKPACK, self.tempSlot, self.currentStackCount)
+        end
+        return promise
+    end
+
+    local function SetTempStackPending()
+        local promise = Promise:New()
+
+        local eventHandle, timeout
+
+        local function CleanUp()
+            self.pendingItemUpdateCallback = nil
+            ClearCallLater(timeout)
+        end
+
+        timeout = zo_callLater(function()
+            CleanUp()
+            promise:Reject(TEMP_STACK_ERROR_TIMEOUT_ON_SET_PENDING)
+        end, TEMP_STACK_WATCHDOG_TIMEOUT)
+
+        -- save the current data before it is cleared
+        local sellPrice = self.currentSellPrice
+
+        self.pendingItemUpdateCallback = function(slotId)
+            CleanUp()
+            tradingHouse:SetPendingPostPrice(sellPrice, SUPPRESS_PRICE_PER_PIECE_UPDATE)
+            if(self.tempSlot ~= self.pendingSlotIndex) then
+                promise:Reject(TEMP_STACK_ERROR_SLOT_DID_NOT_UPDATE)
             else
-                ZO_Alert(UI_ALERT_CATEGORY_ERROR, SOUNDS.NEGATIVE_CLICK, SI_INVENTORY_ERROR_INVENTORY_FULL)
+                promise:Resolve()
             end
+        end
+
+        SetPendingItemPost(BAG_BACKPACK, self.tempSlot, self.currentStackCount)
+        return promise
+    end
+
+    local function UpdateLastSoldData()
+        if(IsItemLinkStackable(self.pendingItemLink)) then
+            self.lastSoldStackCount[self.pendingItemIdentifier] = self.currentStackCount
+        end
+        self.lastSoldPricePerUnit[self.pendingItemIdentifier] = self.currentPricePerUnit
+    end
+
+    tradingHouseWrapper:Wrap("PostPendingItem", function(originalPostPendingItem, tradingHouse)
+        UpdateLastSoldData() -- update regardless of the outcome
+        if(self.requiresTempSlot) then
+            CreateTempStack():Then(SetTempStackPending):Then(function()
+                 -- now we can post the item for real
+                tradingHouse:PostPendingItem()
+            end, function(error)
+                local message = TEMP_STACK_ERROR_MESSAGE[error]
+                if(message) then
+                    ZO_Alert(UI_ALERT_CATEGORY_ERROR, SOUNDS.NEGATIVE_CLICK, message)
+                else
+                    PlaySound(SOUNDS.NEGATIVE_CLICK)
+                    d("[AwesomeGuildStore] Could not create temporary stack", error)
+                end
+            end)
         else
-            if(IsItemLinkStackable(self.pendingItemLink)) then
-                self.lastSoldStackCount[self.pendingItemIdentifier] = self.currentStackCount
-            end
-            self.lastSoldPricePerUnit[self.pendingItemIdentifier] = self.currentPricePerUnit
             originalPostPendingItem(tradingHouse)
         end
     end)
 
-    RegisterForEvent(EVENT_TRADING_HOUSE_RESPONSE_RECEIVED, function(_, responseType, result)
-        if(responseType == TRADING_HOUSE_RESULT_POST_PENDING and result == TRADING_HOUSE_RESULT_SUCCESS) then
-            self:ClearPendingItem()
-        end
-    end)
+    tradingHouseWrapper:PreHook("ClearPendingPost", function(tradingHouse)
+        if(self.pendingBagId == BAG_BACKPACK) then SetPendingItemPost(BAG_BACKPACK, 0, 0) end
 
-    local lastGuildId
-    ZO_PreHook("SelectTradingHouseGuildId", function(guildId)
-        if(guildId ~= lastGuildId) then
-            self:ClearPendingItem()
-            lastGuildId = guildId
-        end
+        self:ClearPendingItemLockColor()
+        self:ClearPendingItem()
+
+        tradingHouse.m_pendingItemSlot = nil
     end)
+    self.tradingHouse = tradingHouse
+end
+
+function SellTabWrapper:ClearPendingItem()
+    self.pendingIcon, self.pendingStackCount, self.pendingSellPrice = "", 0, 0
+    self.pendingBagId, self.pendingSlotIndex, self.requiresTempSlot = 0, 0, false
+    self.currentStackCount, self.currentPricePerUnit, self.currentSellPrice = 0, 0, 0
+    self.pendingItemLink, self.pendingItemIdentifier, self.isMasterWrit = "", "", false
 end
 
 function SellTabWrapper:IsItemAlreadyBeingPosted(inventorySlot)
@@ -429,6 +520,7 @@ function SellTabWrapper:SetQuantity(value, skipUpdateSlider)
     self.currentStackCount = math.max(1, math.min(self.pendingStackCount, value))
     if(not skipUpdateSlider) then self.quantitySlider:UpdateValue() end
     self:UpdateListing()
+    self:UpdateTempSlot()
 end
 
 function SellTabWrapper:GetQuantity()
@@ -446,7 +538,7 @@ function SellTabWrapper:GetUnitPrice()
 end
 
 function SellTabWrapper:UpdateTempSlot()
-    self.requiresTempSlot = (self.currentStackCount ~= self.pendingStackCount or self.pendingBagId ~= BAG_BACKPACK)
+    self.requiresTempSlot = (not self.isMasterWrit) and (self.currentStackCount ~= self.pendingStackCount or self.pendingBagId ~= BAG_BACKPACK)
     if(self.requiresTempSlot) then
         self.tempSlot = FindFirstEmptySlotInBag(BAG_BACKPACK)
         if(not self.tempSlot) then
@@ -475,6 +567,11 @@ function SellTabWrapper:ClearPendingItemLockColor()
     end
 end
 
+local function IsMasterWrit(bagId, slotIndex)
+    local itemType = GetItemType(bagId, slotIndex)
+    return itemType == ITEMTYPE_MASTER_WRIT
+end
+
 function SellTabWrapper:SetPendingItem(bagId, slotIndex)
     local icon, stackCount, sellPrice = GetItemInfo(bagId, slotIndex)
     if(stackCount > 0) then
@@ -483,14 +580,26 @@ function SellTabWrapper:SetPendingItem(bagId, slotIndex)
         self.pendingBagId, self.pendingSlotIndex = bagId, slotIndex
         self.pendingItemLink = GetItemLink(bagId, slotIndex)
         self.pendingItemIdentifier = GetItemIdentifier(self.pendingItemLink)
-        self:UpdateTempSlot()
 
-        self.currentStackCount = self.lastSoldStackCount[self.pendingItemIdentifier] or self.pendingStackCount
-        if(self.currentStackCount > self.pendingStackCount) then
-            self.currentStackCount = self.pendingStackCount
+        self.isMasterWrit = IsMasterWrit(bagId, slotIndex)
+        if(self.isMasterWrit) then
+            self.currentStackCount = GetItemLinkWritCount(self.pendingItemLink) * self.pendingStackCount
+        else
+            self.currentStackCount = self.lastSoldStackCount[self.pendingItemIdentifier] or self.pendingStackCount
+            if(self.currentStackCount > self.pendingStackCount) then
+                self.currentStackCount = self.pendingStackCount
+            end
         end
-        self.currentPricePerUnit = self.lastSoldPricePerUnit[self.pendingItemIdentifier] or GetMasterMerchantLastUsedPrice(self.pendingItemLink) or GetMasterMerchantPrice(self.pendingItemLink) or (sellPrice * 3)
+        self.currentPricePerUnit = self.lastSoldPricePerUnit[self.pendingItemIdentifier]
+        if(not self.currentPricePerUnit) then
+            self.currentPricePerUnit = GetMasterMerchantLastUsedPrice(self.pendingItemLink) or GetMasterMerchantPrice(self.pendingItemLink) or (sellPrice * 3)
+            if(self.isMasterWrit) then
+                self.currentPricePerUnit = self.currentPricePerUnit / self.currentStackCount
+            end
+        end
         self.currentSellPrice = self.currentPricePerUnit * self.currentStackCount
+
+        self:UpdateTempSlot()
 
         self.ppuSlider:SetMinMax(0, math.max(math.ceil(self.currentPricePerUnit * 3), 100))
         self.priceButtonContainer:ClearAnchors()
@@ -499,28 +608,15 @@ function SellTabWrapper:SetPendingItem(bagId, slotIndex)
             self.quantitySlider:Show()
             self.ppuSlider:Show()
             self.priceButtonContainer:SetAnchor(TOPRIGHT, self.ppuSlider, TOPRIGHT, 0, 0)
+        elseif(self.isMasterWrit) then
+            self.quantitySlider:Hide()
+            self.ppuSlider:Show()
+            self.priceButtonContainer:SetAnchor(TOPRIGHT, self.ppuSlider, TOPRIGHT, 0, 0)
         else
             self.quantitySlider:Hide()
             self.ppuSlider:Hide()
             self.priceButtonContainer:SetAnchor(BOTTOMRIGHT, self.sellPriceControl, TOPRIGHT, 0, 0)
         end
-    end
-end
-
-function SellTabWrapper:ClearPendingItem()
-    if(self.pendingBagId == BAG_BACKPACK) then SetPendingItemPost(BAG_BACKPACK, 0, 0) end
-
-    self:ClearPendingItemLockColor()
-
-    self.pendingIcon, self.pendingStackCount, self.pendingSellPrice = "", 0, 0
-    self.pendingBagId, self.pendingSlotIndex, self.requiresTempSlot = 0, 0, false
-    self.currentStackCount, self.currentPricePerUnit, self.currentSellPrice = 0, 0, 0
-    self.pendingItemLink, self.pendingItemIdentifier = "", ""
-
-    local tradingHouse = self.tradingHouse
-    if(tradingHouse) then
-        tradingHouse.m_pendingItemSlot = nil
-        tradingHouse:ClearPendingPost()
     end
 end
 
@@ -534,13 +630,15 @@ function SellTabWrapper:InitializeListedNotification(tradingHouseWrapper)
             local _, guildName = GetCurrentTradingHouseGuildDetails()
             local itemLink = GetItemLink(BAG_BACKPACK, self.m_pendingItemSlot)
 
-            listedMessage = zo_strformat(L["LISTED_NOTIFICATION"], count, itemLink, price, guildName)
+            -- TRANSLATORS: chat message when a item is listed on a store. <<1>> is replaced with the item count, <<t:2>> with the item link, <<3>> with the price and <<4>> with the guild store name. e.g. You have listed 1x [Rosin] for 5000g in Imperial Trading Company
+            listedMessage = gettext("You have listed <<1>>x <<t:2>> for <<3>> in <<4>>", count, itemLink, price, guildName)
         end
         originalPostPendingItem(self)
     end)
 
     RegisterForEvent(EVENT_TRADING_HOUSE_RESPONSE_RECEIVED, function(_, responseType, result)
         if(responseType == TRADING_HOUSE_RESULT_POST_PENDING and result == TRADING_HOUSE_RESULT_SUCCESS) then
+            self.tradingHouse:ClearPendingPost()
             if(saveData.listedNotification and listedMessage ~= "") then
                 df("[AwesomeGuildStore] %s", listedMessage)
                 listedMessage = ""
@@ -560,7 +658,7 @@ function SellTabWrapper:ResetSalesCategoryFilter()
 end
 
 function SellTabWrapper:SetCurrentInventory(bagId)
-    self:ClearPendingItem()
+    self.tradingHouse:ClearPendingPost()
     SCENE_MANAGER:RemoveFragment(self.currentInventoryFragment)
     if(bagId == BAG_BACKPACK) then
         self.currentInventoryFragment = INVENTORY_FRAGMENT

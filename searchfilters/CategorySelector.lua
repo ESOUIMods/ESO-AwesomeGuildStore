@@ -1,4 +1,4 @@
-local L = AwesomeGuildStore.Localization
+local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
 local FILTER_PRESETS = AwesomeGuildStore.FILTER_PRESETS
 local SUBFILTER_PRESETS = AwesomeGuildStore.SUBFILTER_PRESETS
 
@@ -102,21 +102,33 @@ function CategorySelector:New(parent, name, searchTabWrapper, tradingHouseWrappe
 end
 
 function CategorySelector:UpdateSubfilterVisibility()
-	local subfilters = FILTER_PRESETS[self.category].subcategories
-	local subcategory = self.subcategory[self.category]
-	if(subcategory) then subfilters = subfilters[subcategory].subfilters end
+    local categoryPreset = FILTER_PRESETS[self.category]
+    local subcategoryPreset, subfilters
+    local subcategory = self.subcategory[self.category]
+    if(subcategory) then
+        subcategoryPreset = categoryPreset.subcategories[subcategory]
+        subfilters = subcategoryPreset.subfilters
+    end
 
-	for _, subfilter in pairs(self.subfilters) do
-		self.searchTabWrapper:DetachFilter(subfilter)
-	end
-	if(subfilters) then
-		for _, subfilterId in ipairs(subfilters) do
-			local subfilter = self.subfilters[subfilterId]
-			if(subfilter) then
-				self.searchTabWrapper:AttachFilter(subfilter)
-			end
-		end
-	end
+    local searchTab = self.searchTabWrapper
+    if(searchTab.levelFilter) then
+        searchTab:DetachFilter(searchTab.levelFilter)
+        if(categoryPreset.hasLevelFilter or (subcategoryPreset and subcategoryPreset.hasLevelFilter)) then
+            searchTab:AttachFilter(searchTab.levelFilter)
+        end
+    end
+
+    for _, subfilter in pairs(self.subfilters) do
+        searchTab:DetachFilter(subfilter)
+    end
+    if(subfilters) then
+        for _, subfilterId in ipairs(subfilters) do
+            local subfilter = self.subfilters[subfilterId]
+            if(subfilter) then
+                searchTab:AttachFilter(subfilter)
+            end
+        end
+    end
 end
 
 function CategorySelector:CreateSubcategory(name, category, categoryPreset)
@@ -128,7 +140,7 @@ function CategorySelector:CreateSubcategory(name, category, categoryPreset)
 end
 
 function CategorySelector:CreateCategoryButton(group, category, preset)
-	local button = ToggleButton:New(group.control, group.control:GetName() .. preset.name .. "Button", preset.texture, 180 + MAJOR_BUTTON_SIZE * category, 0, MAJOR_BUTTON_SIZE, MAJOR_BUTTON_SIZE, preset.label, SOUNDS.MENU_BAR_CLICK)
+	local button = ToggleButton:New(group.control, group.control:GetName() .. preset.name .. "Button", preset.texture, 180 + MAJOR_BUTTON_SIZE * preset.index, 0, MAJOR_BUTTON_SIZE, MAJOR_BUTTON_SIZE, preset.label, SOUNDS.MENU_BAR_CLICK)
 	button.HandlePress = function()
 		group:ReleaseAllButtons()
 		self.category = category
@@ -186,7 +198,7 @@ local function ShowGuildSpecificItems()
 end
 
 function CategorySelector:CreateSubcategoryButton(group, subcategory, preset)
-	local button = ToggleButton:New(group.control, group.control:GetName() .. "SubcategoryButton" .. subcategory, preset.texture, 170 + MINOR_BUTTON_SIZE * subcategory, 0, MINOR_BUTTON_SIZE, MINOR_BUTTON_SIZE, preset.label, SOUNDS.MENU_BAR_CLICK)
+	local button = ToggleButton:New(group.control, group.control:GetName() .. "SubcategoryButton" .. subcategory, preset.texture, 170 + MINOR_BUTTON_SIZE * (preset.index or subcategory), 0, MINOR_BUTTON_SIZE, MINOR_BUTTON_SIZE, preset.label, SOUNDS.MENU_BAR_CLICK)
 	button.HandlePress = function()
 		group:ReleaseAllButtons()
 		group.label:SetText(preset.label)
@@ -293,16 +305,20 @@ function CategorySelector:GetTooltipText(state)
 
 	local category, subcategory
 	local lines = {}
+	-- TRANSLATORS: label for the selected category in the search library entry tooltip
+	local categoryTitle = gettext("Category")
+    -- TRANSLATORS: label for the selected subcategory in the search library entry tooltip
+	local subcategoryTitle = gettext("Subcategory")
 	for index, value in ipairs(values) do
 		if(index == 1) then
 			category = FILTER_PRESETS[tonumber(value)]
 			if(category) then
-				lines[#lines + 1] = {label = L["CATEGORY_TITLE"], text = category.label}
+				lines[#lines + 1] = {label = categoryTitle, text = category.label}
 			end
 		elseif(index == 2 and category) then
 			subcategory = category.subcategories[tonumber(value)]
 			if(subcategory) then
-				lines[#lines + 1] = {label = L["SUBCATEGORY_TITLE"], text = subcategory.label}
+				lines[#lines + 1] = {label = subcategoryTitle, text = subcategory.label}
 			end
 		elseif(subcategory) then
 			local subfilterId, subfilterValues = zo_strsplit(",", value)

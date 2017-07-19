@@ -38,6 +38,7 @@ function TradingHouseWrapper:Initialize(saveData)
             [ZO_TRADING_HOUSE_MODE_LISTINGS] = listingTab,
         }
 
+    local CollectGuildKiosk = AwesomeGuildStore.CollectGuildKiosk
     self:Wrap("OpenTradingHouse", function(originalOpenTradingHouse, ...)
         originalOpenTradingHouse(...)
         self:SetInterceptInventoryItemClicks(false)
@@ -46,6 +47,9 @@ function TradingHouseWrapper:Initialize(saveData)
             zo_callLater(function() -- TODO: put this in the right spot so that we don't need a callLater
                 searchTab:Search()
             end, 500)
+        end
+        if(CollectGuildKiosk) then
+            CollectGuildKiosk()
         end
     end)
 
@@ -95,11 +99,12 @@ function TradingHouseWrapper:Initialize(saveData)
         if currentTab then
             currentTab:OnClose(self)
         end
-        sellTab:ClearPendingItem()
+        tradingHouse:ClearPendingPost()
     end)
 
     local KIOSK_OPTION_INDEX = 1
-    RegisterForEvent(EVENT_CHATTER_BEGIN, function(_, optionCount)
+    local INTERACT_WINDOW_SHOWN = "Shown"
+    INTERACT_WINDOW:RegisterCallback(INTERACT_WINDOW_SHOWN, function()
         if(IsShiftKeyDown() or not saveData.skipGuildKioskDialog) then return end
         local _, optionType = GetChatterOption(KIOSK_OPTION_INDEX)
         if(optionType == CHATTER_START_TRADINGHOUSE) then

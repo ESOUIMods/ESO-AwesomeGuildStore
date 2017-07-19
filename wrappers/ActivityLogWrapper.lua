@@ -41,7 +41,7 @@ function ActivityLogWrapper:Initialize()
 
 	RegisterForEvent(EVENT_GUILD_HISTORY_CATEGORY_UPDATED, function(_, guildId, category)
 		if(category == GUILD_HISTORY_STORE) then
-			local guildState = self.state[guildId] -- TODO: test why this is nil after getting kicked, reinvited and kicked again from a guild
+			local guildState = self.state[guildId]
 			if(not guildState) then d("[AwesomeGuildStore] guildState not correctly initialized. Please report this to the author.") return end
 			local oldest, newest, endIndex = self:GetMinMaxPurchaseEventTimes(guildId, guildState.highestIndex)
 			guildState.hasMore = DoesGuildHistoryCategoryHaveMoreEvents(guildId, category)

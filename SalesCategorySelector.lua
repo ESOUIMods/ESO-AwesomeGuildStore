@@ -1,4 +1,3 @@
-local L = AwesomeGuildStore.Localization
 local FILTER_PRESETS = AwesomeGuildStore.FILTER_PRESETS
 
 local MAJOR_BUTTON_SIZE = 46
@@ -15,7 +14,7 @@ local SalesCategorySelector = ZO_Object:Subclass()
 AwesomeGuildStore.SalesCategorySelector = SalesCategorySelector
 
 local ALL_CRAFTING_PRESET = {
-    label = L["FILTER_SUBCATEGORY_ALL"],
+    label = GetString("SI_ITEMFILTERTYPE", ITEMFILTERTYPE_ALL),
     texture = "EsoUI/Art/Inventory/inventory_tabIcon_all_%s.dds",
     isDefault = true,
     filters = {
@@ -92,18 +91,13 @@ end
 function SalesCategorySelector:CreateSubcategory(name, category, categoryPreset)
     if(#categoryPreset.subcategories == 0) then return end
     local group = self:CreateSubcategoryGroup(name .. categoryPreset.name .. "Group", category)
-    local isCrafting = nil
-    if(category == ITEMFILTERTYPE_CRAFTING) then
-        self:CreateSubcategoryButton(group, 0, ALL_CRAFTING_PRESET, true)
-        isCrafting = true
-    end
     for subcategory, preset in pairs(categoryPreset.subcategories) do
-        self:CreateSubcategoryButton(group, subcategory, preset, isCrafting)
+        self:CreateSubcategoryButton(group, subcategory, preset)
     end
 end
 
 function SalesCategorySelector:CreateCategoryButton(group, category, preset)
-    local button = ToggleButton:New(group.control, group.control:GetName() .. preset.name .. "Button", preset.texture, 180 + MAJOR_BUTTON_SIZE * category, 0, MAJOR_BUTTON_SIZE, MAJOR_BUTTON_SIZE, preset.label, SOUNDS.MENU_BAR_CLICK)
+    local button = ToggleButton:New(group.control, group.control:GetName() .. preset.name .. "Button", preset.texture, 140 + MAJOR_BUTTON_SIZE * preset.index, 0, MAJOR_BUTTON_SIZE, MAJOR_BUTTON_SIZE, preset.label, SOUNDS.MENU_BAR_CLICK)
     button.HandlePress = function()
         group:ReleaseAllButtons()
         self.category = category
@@ -152,9 +146,8 @@ function SalesCategorySelector:CreateSubcategoryGroup(name, category)
     return group
 end
 
-function SalesCategorySelector:CreateSubcategoryButton(group, subcategory, preset, isCrafting)
-    local offset = 140 + (isCrafting and MINOR_BUTTON_SIZE or 0)
-    local button = ToggleButton:New(group.control, group.control:GetName() .. "SubcategoryButton" .. subcategory, preset.texture, offset + MINOR_BUTTON_SIZE * subcategory, 0, MINOR_BUTTON_SIZE, MINOR_BUTTON_SIZE, preset.label, SOUNDS.MENU_BAR_CLICK)
+function SalesCategorySelector:CreateSubcategoryButton(group, subcategory, preset)
+    local button = ToggleButton:New(group.control, group.control:GetName() .. "SubcategoryButton" .. subcategory, preset.texture, 120 + MINOR_BUTTON_SIZE * (preset.index or subcategory), 0, MINOR_BUTTON_SIZE, MINOR_BUTTON_SIZE, preset.label, SOUNDS.MENU_BAR_CLICK)
     button.HandlePress = function()
         group:ReleaseAllButtons()
         group.label:SetText(preset.label)
@@ -166,7 +159,7 @@ function SalesCategorySelector:CreateSubcategoryButton(group, subcategory, prese
         return fromGroup
     end
     button.value = subcategory
-    if(preset.isDefault and ((not isCrafting) or (isCrafting and subcategory == 0))) then
+    if(preset.isDefault) then
         group.defaultButton = button
         button:Press()
     end
@@ -203,8 +196,13 @@ local function SalesCategoryFilter(slot)
                 isValid = isValid and contains(values, GetItemLinkWeaponType(itemLink))
             elseif(type == TRADING_HOUSE_FILTER_TYPE_ARMOR) then
                 isValid = isValid and contains(values, GetItemLinkArmorType(itemLink))
-            elseif(type == TRADING_HOUSE_FILTER_TYPE_ITEM) then
-                isValid = isValid and contains(values, GetItemLinkItemType(itemLink))
+            elseif(type == TRADING_HOUSE_FILTER_TYPE_ITEM or type == TRADING_HOUSE_FILTER_TYPE_SPECIALIZED_ITEM) then
+                local itemType, specializedItemType = GetItemLinkItemType(itemLink)
+                if(type == TRADING_HOUSE_FILTER_TYPE_ITEM) then
+                    isValid = isValid and contains(values, itemType)
+                else
+                    isValid = isValid and contains(values, specializedItemType)
+                end
             end
             if(not isValid) then break end
         end
