@@ -1,6 +1,7 @@
 local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
 local RegisterForEvent = AwesomeGuildStore.RegisterForEvent
 local UnregisterForEvent = AwesomeGuildStore.UnregisterForEvent
+local Print = AwesomeGuildStore.Print
 local ToggleButton = AwesomeGuildStore.ToggleButton
 local ClearCallLater = AwesomeGuildStore.ClearCallLater
 local GetItemLinkWritCount = AwesomeGuildStore.GetItemLinkWritCount
@@ -276,12 +277,28 @@ function SellTabWrapper:InitializeListingInput(tradingHouseWrapper)
     highlight:ClearAnchors()
     highlight:SetAnchor(TOPRIGHT, bg, TOPRIGHT, 10, -18)
 
+    local invoice = tradingHouse.m_invoice
+    local profitLabel = invoice:GetNamedChild("ProfitLabel")
+    local profitWarning = CreateControlFromVirtual("$(parent)ProfitWarning", invoice, "ZO_HelpIcon")
+    profitWarning:SetAnchor(RIGHT, profitLabel, LEFT, -3, 0)
+    profitWarning:SetTexture("EsoUI/Art/Miscellaneous/ESO_Icon_Warning.dds")
+    profitWarning:SetHidden(true)
+    -- TRANSLATORS: tooltip text for the profit warning icon on the sell tab
+    ZO_HelpIcon_Initialize(profitWarning, gettext("Profit is below vendor price. You'll get more out of selling this item to a merchant."), RIGHT)
+    self.profitWarning = profitWarning
+
     tradingHouseWrapper:PreHook("SetPendingPostPrice", function(tradingHouse, gold, skipPricePerPieceUpdate)
         self.currentSellPrice = gold
         if(not skipPricePerPieceUpdate and self.pendingStackCount > 0) then
             self:SetUnitPrice(gold / (self.currentStackCount + 1e-9))
         end
     end)
+end
+
+function SellTabWrapper:IsAboveVendorPrice()
+    local _, _, currentProfit = GetTradingHousePostPriceInfo(self.currentSellPrice)
+    local vendorProfit = self.pendingSellPrice * self.currentStackCount
+    return currentProfit >= vendorProfit
 end
 
 function SellTabWrapper:InitializeCategoryFilter(tradingHouseWrapper)
@@ -359,7 +376,7 @@ function SellTabWrapper:InitializeCraftingBag(tradingHouseWrapper)
             end
             actionType = "primary"
         end
-        oAddSlotAction(slotActions, actionStringId, actionCallback, actionType, visibilityFunction, options)
+        return oAddSlotAction(slotActions, actionStringId, actionCallback, actionType, visibilityFunction, options)
     end
 
     RegisterForEvent(EVENT_TRADING_HOUSE_PENDING_ITEM_UPDATE, function(_, slotId, isPending)
@@ -474,7 +491,7 @@ function SellTabWrapper:InitializeCraftingBag(tradingHouseWrapper)
                     ZO_Alert(UI_ALERT_CATEGORY_ERROR, SOUNDS.NEGATIVE_CLICK, message)
                 else
                     PlaySound(SOUNDS.NEGATIVE_CLICK)
-                    d("[AwesomeGuildStore] Could not create temporary stack", error)
+                    Print("Could not create temporary stack", error)
                 end
             end)
         else
@@ -514,6 +531,7 @@ function SellTabWrapper:UpdateListing()
     local price = math.ceil(self.currentStackCount * self.currentPricePerUnit)
     ZO_ItemSlot_SetupSlot(tradingHouse.m_pendingItem, self.currentStackCount, self.pendingIcon)
     tradingHouse:SetPendingPostPrice(price, SUPPRESS_PRICE_PER_PIECE_UPDATE)
+    self.profitWarning:SetHidden(self:IsAboveVendorPrice())
 end
 
 function SellTabWrapper:SetQuantity(value, skipUpdateSlider)
@@ -640,7 +658,7 @@ function SellTabWrapper:InitializeListedNotification(tradingHouseWrapper)
         if(responseType == TRADING_HOUSE_RESULT_POST_PENDING and result == TRADING_HOUSE_RESULT_SUCCESS) then
             self.tradingHouse:ClearPendingPost()
             if(saveData.listedNotification and listedMessage ~= "") then
-                df("[AwesomeGuildStore] %s", listedMessage)
+                Print(listedMessage)
                 listedMessage = ""
             end
         end

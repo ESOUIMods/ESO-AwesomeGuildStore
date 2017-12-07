@@ -1,8 +1,12 @@
 local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
 local RegisterForEvent = AwesomeGuildStore.RegisterForEvent
+local Print = AwesomeGuildStore.Print
 local ToggleButton = AwesomeGuildStore.ToggleButton
 local FILTER_PRESETS = AwesomeGuildStore.FILTER_PRESETS
 local SUBFILTER_PRESETS = AwesomeGuildStore.SUBFILTER_PRESETS
+local SORT_FIELD_NAME = "name"
+local SORT_FIELD_SEARCHES = "searches"
+local SORT_FIELD_TIME = "time"
 
 local SEARCH_DATA_TYPE = 1
 local HISTORY_LENGTH = 50
@@ -49,6 +53,9 @@ function SearchLibrary:Initialize(saveData)
 	self.currentState = {}
 
 	self.control = AwesomeGuildStoreSearchLibrary
+	self.fragment = ZO_SimpleSceneFragment:New(self.control)
+	TRADING_HOUSE_SCENE:AddFragment(self.fragment)
+
 	local control = self.control
 	control:SetMovable(not saveData.locked)
 	control:SetResizeHandleSize(not saveData.locked and 5 or 0)
@@ -58,15 +65,15 @@ function SearchLibrary:Initialize(saveData)
 	control:SetHandler("OnUpdate", function() if(resizing) then self:HandleResize() end end)
 	control:SetHandler("OnResizeStop", function() self:HandleResize() self:SavePosition() resizing = false end)
 
-	RegisterForEvent(EVENT_OPEN_TRADING_HOUSE, function()
-		if(saveData.isActive and TRADING_HOUSE:IsInSearchMode()) then
-			self:Show()
-		end
-	end)
-
-	RegisterForEvent(EVENT_CLOSE_TRADING_HOUSE, function()
-		self:Hide()
-	end)
+    self.fragment:RegisterCallback("StateChange", function(oldState, newState)
+        if(newState == SCENE_FRAGMENT_SHOWN) then
+            if(saveData.isActive and TRADING_HOUSE:IsInSearchMode()) then
+                self:Show()
+            else
+                self:Hide()
+            end
+        end
+    end)
 
 	ZO_PreHook(TRADING_HOUSE, "HandleTabSwitch", function(_, tabData)
 		local mode = tabData.descriptor
@@ -146,9 +153,9 @@ function SearchLibrary:Initialize(saveData)
 		return true
 	end
 
-	self.favoritesSortHeaderGroup:SelectHeaderByKey(saveData.favoritesSortField, ZO_SortHeaderGroup.SUPPRESS_CALLBACKS)
+	self.favoritesSortHeaderGroup:SelectHeaderByKey(saveData.favoritesSortField or SORT_FIELD_SEARCHES, ZO_SortHeaderGroup.SUPPRESS_CALLBACKS)
 	if(saveData.favoritesSortOrder == ZO_SORT_ORDER_DOWN) then -- call it a second time to invert the sort order
-		self.favoritesSortHeaderGroup:SelectHeaderByKey(saveData.favoritesSortField, ZO_SortHeaderGroup.SUPPRESS_CALLBACKS)
+		self.favoritesSortHeaderGroup:SelectHeaderByKey(saveData.favoritesSortField or SORT_FIELD_SEARCHES, ZO_SortHeaderGroup.SUPPRESS_CALLBACKS)
 	end
 
 	if(saveData.isActive) then
@@ -282,8 +289,8 @@ function SearchLibrary:SaveEditBoxChanges()
 end
 
 function SearchLibrary:RegisterFilter(filter)
-	if(not filter or not filter.type) then d("[AwesomeGuildStore] Warning: Invalid filter type") return end
-	if(self.filterByType[filter.type]) then d("[AwesomeGuildStore] Warning: Filter type already registered") return end
+	if(not filter or not filter.type) then Print("Warning: Invalid filter type") return end
+	if(self.filterByType[filter.type]) then Print("Warning: Filter type already registered") return end
 
 	self.filters[#self.filters + 1] = filter
 	self.filterByType[filter.type] = filter
@@ -583,13 +590,13 @@ function SearchLibrary:InitializeFavorites()
 
 	local nameHeader = CreateControlFromVirtual("$(parent)Name", headers, "ZO_SortHeader")
 	-- TRANSLATORS: sort header in the favorites section of the search library
-	ZO_SortHeader_Initialize(nameHeader, gettext("Name"), "name", ZO_SORT_ORDER_UP, TEXT_ALIGN_LEFT, "ZoFontGameLargeBold")
+	ZO_SortHeader_Initialize(nameHeader, gettext("Name"), SORT_FIELD_NAME, ZO_SORT_ORDER_UP, TEXT_ALIGN_LEFT, "ZoFontGameLargeBold")
 	nameHeader:SetAnchor(TOPLEFT, nil, TOPLEFT, 0, 0)
 	nameHeader:SetDimensions(80, 32)
 
 	local searchCountHeader = CreateControlFromVirtual("$(parent)SearchCount", headers, "ZO_SortHeader")
     -- TRANSLATORS: sort header in the favorites section of the search library
-	ZO_SortHeader_Initialize(searchCountHeader, gettext("Searches"), "searches", ZO_SORT_ORDER_UP, TEXT_ALIGN_LEFT, "ZoFontGameLargeBold")
+	ZO_SortHeader_Initialize(searchCountHeader, gettext("Searches"), SORT_FIELD_SEARCHES, ZO_SORT_ORDER_UP, TEXT_ALIGN_LEFT, "ZoFontGameLargeBold")
 	searchCountHeader:SetAnchor(TOPLEFT, nameHeader, TOPRIGHT, 0, 0)
 	searchCountHeader:SetDimensions(80, 32)
 
@@ -836,15 +843,15 @@ local function SortByTimeDesc(entryA, entryB)
 end
 
 local SORT_FUNCTIONS = {
-	["name"] = {
+	[SORT_FIELD_NAME] = {
 		[ZO_SORT_ORDER_UP] = SortByNameAsc,
 		[ZO_SORT_ORDER_DOWN] = SortByNameDesc
 	},
-	["searches"] = {
+	[SORT_FIELD_SEARCHES] = {
 		[ZO_SORT_ORDER_UP] = SortBySearchCountAsc,
 		[ZO_SORT_ORDER_DOWN] = SortBySearchCountDesc
 	},
-	["time"] = {
+	[SORT_FIELD_TIME] = {
 		[ZO_SORT_ORDER_UP] = SortByTimeAsc,
 		[ZO_SORT_ORDER_DOWN] = SortByTimeDesc
 	},
@@ -896,7 +903,7 @@ end
 
 function SearchLibrary:RebuildFavorites(skipUpdateHighlight)
 	if(self.favoritesDirty) then
-		local sortFunction = SORT_FUNCTIONS[self.saveData.favoritesSortField][self.saveData.favoritesSortOrder] or SortBySearchCountDesc
+		local sortFunction = SORT_FUNCTIONS[self.saveData.favoritesSortField or SORT_FIELD_SEARCHES][self.saveData.favoritesSortOrder or ZO_SORT_ORDER_DOWN] or SortBySearchCountDesc
 		RebuildScrollList(self.favoritesControl, self.searchList, sortFunction, FilterFavoriteEntires)
 		self:UpdateFavoriteButtonState()
 		if(not skipUpdateHighlight) then

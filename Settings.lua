@@ -1,7 +1,7 @@
 local function LoadSettings()
     local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
     local defaultData = {
-        version = 21,
+        version = 23,
         lastGuildName = "",
         keepFiltersOnClose = true,
         oldQualitySelectorBehavior = false,
@@ -39,7 +39,24 @@ local function LoadSettings()
         },
         hasTouchedAction = {},
         guildTraderListEnabled = false,
+        resetFiltersOnExit = false,
+        keepPurchasedResultsInList = true,
+        minimizeChatOnOpen = true,
+        shortMessagePrefix = false
     }
+
+    local function RepairSaveData(saveData)
+        for key, value in pairs(defaultData) do
+            if(saveData[key] == nil) then
+                saveData[key] = value
+            end
+        end
+        for key, value in pairs(defaultData.searchLibrary) do
+            if(saveData.searchLibrary[key] == nil) then
+                saveData.searchLibrary[key] = value
+            end
+        end
+    end
 
     local function CreateSettingsDialog(saveData)
         local LAM = LibStub("LibAddonMenu-2.0")
@@ -47,13 +64,63 @@ local function LoadSettings()
             type = "panel",
             name = "Awesome Guild Store",
             author = "sirinsidiator",
-            version = "0.37.2",
+            version = "0.40",
             website = "http://www.esoui.com/downloads/info695-AwesomeGuildStore.html",
             registerForRefresh = true,
             registerForDefaults = true
         }
         local panel = LAM:RegisterAddonPanel("AwesomeGuildStoreOptions", panelData)
         local optionsData = {}
+        optionsData[#optionsData + 1] = {
+            type = "checkbox",
+            -- TRANSLATORS: label for an entry in the addon settings
+            name = gettext("Short prefix for chat messages"),
+            -- TRANSLATORS: tooltip text for an entry in the addon settings
+            tooltip = gettext("When activated, all chat messages will be prefixed with [AGS] instead of [AwesomeGuildStore]."),
+            getFunc = function() return saveData.shortMessagePrefix end,
+            setFunc = function(value)
+                saveData.shortMessagePrefix = value
+                AwesomeGuildStore.SetMessagePrefix(value)
+            end,
+            default = defaultData.shortMessagePrefix,
+        }
+        optionsData[#optionsData + 1] = {
+            type = "checkbox",
+            -- TRANSLATORS: label for an entry in the addon settings
+            name = gettext("Reset search filters on exit"),
+            -- TRANSLATORS: tooltip text for an entry in the addon settings
+            tooltip = gettext("When activated, all filters will reset when closing the trading house window. This mimics the old behavior of the store before ZOS changed it."),
+            getFunc = function() return saveData.resetFiltersOnExit end,
+            setFunc = function(value) saveData.resetFiltersOnExit = value end,
+            default = defaultData.resetFiltersOnExit,
+        }
+        optionsData[#optionsData + 1] = {
+            type = "checkbox",
+            -- TRANSLATORS: label for an entry in the addon settings
+            name = gettext("Keep purchased items in result list"),
+            -- TRANSLATORS: tooltip text for an entry in the addon settings
+            tooltip = gettext("When activated, purchased items will stay in the list and get marked as purchased instead, until you leave the page they are on or start a new search."),
+            getFunc = function() return saveData.keepPurchasedResultsInList end,
+            setFunc = function(value) saveData.keepPurchasedResultsInList = value end,
+            default = defaultData.keepPurchasedResultsInList,
+        }
+        optionsData[#optionsData + 1] = {
+            type = "checkbox",
+            -- TRANSLATORS: label for an entry in the addon settings
+            name = gettext("Minimize chat on open"),
+            -- TRANSLATORS: tooltip text for an entry in the addon settings
+            tooltip = gettext("When activated, the chat window will get minimized when visiting a trading house. This defaults to true since it is the new default behavior added by ZOS."),
+            getFunc = function() return saveData.minimizeChatOnOpen end,
+            setFunc = function(value) 
+                saveData.minimizeChatOnOpen = value
+                if(value) then
+                    TRADING_HOUSE_SCENE:AddFragment(MINIMIZE_CHAT_FRAGMENT)
+                else
+                    TRADING_HOUSE_SCENE:RemoveFragment(MINIMIZE_CHAT_FRAGMENT)
+                end
+            end,
+            default = defaultData.minimizeChatOnOpen,
+        }
         optionsData[#optionsData + 1] = {
             type = "checkbox",
             -- TRANSLATORS: label for an entry in the addon settings
@@ -388,6 +455,16 @@ local function LoadSettings()
             saveData.guildTraderListEnabled = defaultData.guildTraderListEnabled
             saveData.version = 21
         end
+        if(saveData.version == 21) then
+            saveData.resetFiltersOnExit = defaultData.resetFiltersOnExit
+            saveData.keepPurchasedResultsInList = defaultData.keepPurchasedResultsInList
+            saveData.minimizeChatOnOpen = defaultData.minimizeChatOnOpen
+            saveData.version = 22
+        end
+        if(saveData.version == 22) then
+            saveData.shortMessagePrefix = defaultData.shortMessagePrefix
+            saveData.version = 23
+        end
     end
 
     AwesomeGuildStore_Data = AwesomeGuildStore_Data or {}
@@ -396,6 +473,7 @@ local function LoadSettings()
     AwesomeGuildStore.defaultData = defaultData
 
     UpgradeSettings(saveData)
+    RepairSaveData(saveData)
 
     CreateSettingsDialog(saveData)
 

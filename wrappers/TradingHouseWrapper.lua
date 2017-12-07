@@ -63,6 +63,10 @@ function TradingHouseWrapper:Initialize(saveData)
             tab:RunInitialSetup(self)
         end
 
+        if(not saveData.minimizeChatOnOpen) then
+            TRADING_HOUSE_SCENE:RemoveFragment(MINIMIZE_CHAT_FRAGMENT)
+        end
+
         self:InitializeGuildSelector()
         self:InitializeKeybindStripWrapper()
         self:InitializeSearchCooldown()
@@ -100,6 +104,9 @@ function TradingHouseWrapper:Initialize(saveData)
             currentTab:OnClose(self)
         end
         tradingHouse:ClearPendingPost()
+        if(saveData.resetFiltersOnExit) then
+            tradingHouse:ResetAllSearchData()
+        end
     end)
 
     local KIOSK_OPTION_INDEX = 1

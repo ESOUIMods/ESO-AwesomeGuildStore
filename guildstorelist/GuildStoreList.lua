@@ -4,6 +4,7 @@ local IsLocationVisible = AwesomeGuildStore.IsLocationVisible
 local IsCurrentMapZoneMap = AwesomeGuildStore.IsCurrentMapZoneMap
 local GetKioskName = AwesomeGuildStore.GetKioskName
 local RegisterForEvent = AwesomeGuildStore.RegisterForEvent
+local Print = AwesomeGuildStore.Print
 local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
 
 local KIOSK_ICON = "/esoui/art/icons/servicemappins/servicepin_guildkiosk.dds"
@@ -91,18 +92,44 @@ local function GetUnitStoreIndex(unitTag)
     return BuildStoreIndex(mapName, locationIndex)
 end
 
+local IRREGULAR_TOOLTIP_HEADER = { -- TODO exceptions in other languages
+    -- English
+    ["Orsinium Outlaw Refuge"] = "Orsinium Outlaws Refuge",
+    -- French
+    ["refuge des hors-la-loi d'Orsinium"] = "refuge de hors-la-loi d'Orsinium",
+    -- already fixed, but we keep them to correct the save data
+    ["Vivec Outlaws Refuge"] = "Vivec City Outlaws Refuge",
+}
+
+local function UpdateStoreNames(saveData, oldName, newName)
+    if(saveData.stores[oldName] and not saveData.stores[newName]) then
+        saveData.stores[newName] = saveData.stores[oldName]:gsub(oldName, newName)
+    end
+    saveData.stores[oldName] = nil
+
+    for traderName in pairs(saveData.kiosks) do
+        saveData.kiosks[traderName] = saveData.kiosks[traderName]:gsub(oldName, newName)
+    end
+end
+
 local function UpdateSaveData(saveData)
     if(saveData.version == 1) then
         saveData.stores = AwesomeGuildStore.StoreList.UpdateStoreIds(saveData.stores)
         saveData.kiosks = AwesomeGuildStore.KioskList.UpdateStoreIds(saveData.kiosks)
         saveData.version = 2
     end
+    if(saveData.version < 5) then
+        for oldName, newName in pairs(IRREGULAR_TOOLTIP_HEADER) do
+            UpdateStoreNames(saveData, oldName, newName)
+        end
+        saveData.version = 5
+    end
 end
 
 local function InitializeSaveData(saveData)
     if(not saveData.guildStoreList) then
         saveData.guildStoreList = {
-            version = 2,
+            version = 3,
             owners = {},
             stores = {},
             kiosks = {},
@@ -315,6 +342,16 @@ local function InitializeStoreListWindow(saveData, kioskList, storeList, ownerLi
     end
     guildTradersScene.RefreshTraderList = RefreshTraderList
 
+    local function OpenListOnKiosk(kioskName)
+        traderList:RefreshData()
+        local data = traderList:GetKioskEntryInList(kioskName)
+        if(data) then
+            SetSelectedDetails(data)
+        end
+        MAIN_MENU_KEYBOARD:ShowScene(sceneName)
+    end
+    AwesomeGuildStore.OpenTraderListOnKiosk = OpenListOnKiosk
+
     local function RegisterListUpdate()
         EVENT_MANAGER:RegisterForUpdate(REFRESH_HANDLE, REFRESH_INTERVAL, RefreshTraderList)
     end
@@ -407,7 +444,8 @@ local function InitializeStoreListWindow(saveData, kioskList, storeList, ownerLi
 
     local function OnHistoryMouseUp(control, button, upInside)
         if(upInside) then
-        -- TODO select guild and show guild information scene
+            local data = ZO_ScrollList_GetData(control)
+            AwesomeGuildStore.OpenGuildListOnGuild(data.owner)
         end
     end
 
@@ -496,11 +534,6 @@ local function IsUndergroundKiosk()
     return GetMapContentType() == MAP_CONTENT_DUNGEON
 end
 
-local IRREGULAR_TOOLTIP_HEADER = { -- TODO exceptions in other languages
-    ["Orsinium Outlaw Refuge"] = "Orsinium Outlaws Refuge",
-    ["Vivec City Outlaws Refuge"] = "Vivec Outlaws Refuge"
-}
-
 local function GetMapLocationName(locationIndex)
     local name = GetMapLocationTooltipHeader(locationIndex)
     return IRREGULAR_TOOLTIP_HEADER[name] or name
@@ -539,7 +572,7 @@ local function InitializeGuildStoreList(globalSaveData)
         saveData.language = lang
     end
     if(lang ~= saveData.language) then
-        d("[AwesomeGuildStore] Cannot initialize guild trader list. Either clear all data in the settings or switch back to your original language.")
+        Print("Cannot initialize guild trader list. Either clear all data in the settings or switch back to your original language.")
         return
     end
 
@@ -547,10 +580,12 @@ local function InitializeGuildStoreList(globalSaveData)
     local storeList = AwesomeGuildStore.StoreList:New(saveData.stores)
     local kioskList = AwesomeGuildStore.KioskList:New(saveData.kiosks)
     local guildTradersScene = InitializeStoreListWindow(saveData, kioskList, storeList, ownerList)
+    local guildList = AwesomeGuildStore.InitializeGuildList(saveData, kioskList, storeList, ownerList)
     AwesomeGuildStore.gsl = {
         ownerList = ownerList,
         storeList = storeList,
         kioskList = kioskList,
+        guildList = guildList
     }
 
     local function CollectStoresOnMap(mapName, mapIndex, zoneIndex, x, y)
