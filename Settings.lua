@@ -64,7 +64,7 @@ local function LoadSettings()
             type = "panel",
             name = "Awesome Guild Store",
             author = "sirinsidiator",
-            version = "0.40",
+            version = "0.41",
             website = "http://www.esoui.com/downloads/info695-AwesomeGuildStore.html",
             registerForRefresh = true,
             registerForDefaults = true

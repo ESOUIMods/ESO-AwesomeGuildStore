@@ -38,30 +38,38 @@ function TradingHouseWrapper:Initialize(saveData)
             [ZO_TRADING_HOUSE_MODE_LISTINGS] = listingTab,
         }
 
+    -- we cannot wrap TRADING_HOUSE.OpenTradingHouse or RunInitialSetup as it would taint the call stack down the line
+    -- e.g. when using inventory items or withdrawing from the bank
+    -- instead we use the EVENT_OPEN_TRADING_HOUSE and hook into the first method after RunInitialSetup is called
     local CollectGuildKiosk = AwesomeGuildStore.CollectGuildKiosk
-    self:Wrap("OpenTradingHouse", function(originalOpenTradingHouse, ...)
-        originalOpenTradingHouse(...)
+    RegisterForEvent(EVENT_OPEN_TRADING_HOUSE, function()
         self:SetInterceptInventoryItemClicks(false)
         self:ResetSalesCategoryFilter()
-        if(saveData.autoSearch) then
-            zo_callLater(function() -- TODO: put this in the right spot so that we don't need a callLater
-                searchTab:Search()
-            end, 500)
-        end
         if(CollectGuildKiosk) then
             CollectGuildKiosk()
         end
     end)
 
     local ranInitialSetup = false
-    self:Wrap("RunInitialSetup", function(originalRunInitialSetup, ...)
-        local tradingHouseManager = originalRunInitialSetup(...)
+    -- SetCurrentMode is the first method called after RunInitialSetup
+    self:PreHook("SetCurrentMode", function()
+        if(ranInitialSetup) then return end
         tradingHouse.m_numItemsOnPage = 0
 
         AwesomeGuildStore:FireBeforeInitialSetupCallbacks(self)
         for mode, tab in next, self.modeToTab do
             tab:RunInitialSetup(self)
         end
+
+        RegisterForEvent(EVENT_TRADING_HOUSE_STATUS_RECEIVED, function()
+            if(saveData.autoSearch) then
+                -- we can't call it inside the event handler as it would trigger an alert
+                -- instead we call it in the next frame via zo_callLater
+                zo_callLater(function()
+                    searchTab:Search()
+                end, 0)
+            end
+        end)
 
         if(not saveData.minimizeChatOnOpen) then
             TRADING_HOUSE_SCENE:RemoveFragment(MINIMIZE_CHAT_FRAGMENT)
@@ -71,8 +79,8 @@ function TradingHouseWrapper:Initialize(saveData)
         self:InitializeKeybindStripWrapper()
         self:InitializeSearchCooldown()
         AwesomeGuildStore:FireAfterInitialSetupCallbacks(self)
+
         ranInitialSetup = true
-        return tradingHouseManager
     end)
 
     self:PreHook("ClearSearchResults", function(self) self.m_numItemsOnPage = 0 end)
