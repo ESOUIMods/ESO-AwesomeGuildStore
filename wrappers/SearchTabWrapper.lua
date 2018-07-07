@@ -307,6 +307,11 @@ function SearchTabWrapper:InitializeFilters(tradingHouseWrapper)
     searchLibrary:RegisterFilter(textFilter)
     self.textFilter = textFilter
 
+    local sellerFilter = AwesomeGuildStore.SellerFilter:New("AwesomeGuildStoreSellerFilter", tradingHouseWrapper)
+    self:AttachFilter(sellerFilter)
+    searchLibrary:RegisterFilter(sellerFilter)
+    self.sellerFilter = sellerFilter
+
     AwesomeGuildStore:FireOnInitializeFiltersCallbacks(tradingHouseWrapper)
 
     if(saveData.keepFiltersOnClose) then

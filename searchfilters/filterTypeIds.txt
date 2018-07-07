@@ -49,3 +49,4 @@
 101 - MasterMerchant DealFilter
 102 - CookeryWiz Recipe Filter
 103 - WritWorthy Writcost Filter
+104 - @Name Filter
