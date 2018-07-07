@@ -95,9 +95,9 @@ do
     local LONG_PREFIX = "AwesomeGuildStore"
     local SHORT_PREFIX = "AGS"
 
-    local prefix = LONG_PREFIX 
+    local prefix = LONG_PREFIX
     local function SetMessagePrefix(isShort)
-        prefix = isShort and SHORT_PREFIX or LONG_PREFIX 
+        prefix = isShort and SHORT_PREFIX or LONG_PREFIX
     end
 
     local function Print(message, ...)
@@ -116,7 +116,118 @@ local function IsSameAction(actionName, layerIndex, categoryIndex, actionIndex)
     return not (layerIndex ~= targetTayerIndex or categoryIndex ~= targetCategoryIndex or actionIndex ~= targetActionIndex)
 end
 
+local function IntegrityCheck()
+    assert(LibStub)
+    assert(LibStub("LibAddonMenu-2.0", true))
+    assert(LAMCreateControl.panel)
+    assert(LAMCreateControl.submenu)
+    assert(LAMCreateControl.button)
+    assert(LAMCreateControl.checkbox)
+    assert(LAMCreateControl.colorpicker)
+    assert(LAMCreateControl.custom)
+    assert(LAMCreateControl.description)
+    assert(LAMCreateControl.dropdown)
+    assert(LAMCreateControl.editbox)
+    assert(LAMCreateControl.header)
+    assert(LAMCreateControl.slider)
+    assert(LAMCreateControl.iconpicker)
+    assert(LAMCreateControl.divider)
+    assert(LibStub("LibFilters-2.0", true))
+    assert(LibStub("libCommonInventoryFilters", true))
+    assert(LibStub("LibTextFilter", true))
+    assert(LibStub("LibCustomMenu", true))
+    assert(LibStub("LibMapPing", true))
+    assert(LibStub("LibGPS2", true))
+    assert(LibStub("LibDateTime", true))
+    assert(LibStub("LibPromises", true))
+    assert(LibStub("LibGetText", true))
+    assert(AwesomeGuildStore.LoadSettings)
+    assert(AwesomeGuildStore.IsUnitGuildKiosk)
+    assert(AwesomeGuildStore.MinMaxRangeSlider)
+    assert(AwesomeGuildStore.ButtonGroup)
+    assert(AwesomeGuildStore.ToggleButton)
+    assert(AwesomeGuildStore.SimpleIconButton)
+    assert(AwesomeGuildStore.LoadingIcon)
+    assert(AwesomeGuildStore.FilterBase)
+    assert(AwesomeGuildStore.FILTER_PRESETS)
+    assert(AwesomeGuildStore.CategorySubfilter)
+    assert(AwesomeGuildStore.KnownRecipeFilter)
+    assert(AwesomeGuildStore.KnownMotifFilter)
+    assert(AwesomeGuildStore.KnownRuneTranslationFilter)
+    assert(AwesomeGuildStore.ResearchableTraitsFilter)
+    assert(AwesomeGuildStore.ItemStyleFilter)
+    assert(AwesomeGuildStore.ItemSetFilter)
+    assert(AwesomeGuildStore.CraftedItemFilter)
+    assert(AwesomeGuildStore.CategorySelector)
+    assert(AwesomeGuildStore.PriceFilter)
+    assert(AwesomeGuildStore.LevelFilter)
+    assert(AwesomeGuildStore.QualityFilter)
+    assert(AwesomeGuildStore.TextFilter)
+    assert(AwesomeGuildStore.UnitPriceFilter)
+    assert(AwesomeGuildStore.RecipeImprovementFilter)
+    assert(AwesomeGuildStore.SavedSearchTooltip)
+    assert(AwesomeGuildStore.SearchLibrary)
+    assert(AwesomeGuildStoreSearchLibrary)
+    assert(AwesomeGuildStore.InitializeAugmentedMails)
+    assert(AwesomeGuildStore.HiredTraderTooltip)
+    assert(AwesomeGuildStore.GuildSelector)
+    assert(AwesomeGuildStore.Paging)
+    assert(AwesomeGuildStore.ActivityBase)
+    assert(AwesomeGuildStore.CancelSaleOperation)
+    assert(AwesomeGuildStore.RequestListingsOperation)
+    assert(AwesomeGuildStore.ExecuteSearchOperation)
+    assert(AwesomeGuildStore.SwitchGuildOperation)
+    assert(AwesomeGuildStore.ActivityManager)
+    assert(AwesomeGuildStore.TradingHouseWrapper)
+    assert(AwesomeGuildStore.SearchTabWrapper)
+    assert(AwesomeGuildStore.SellTabWrapper)
+    assert(AwesomeGuildStore.ListingTabWrapper)
+    assert(AwesomeGuildStore.KeybindStripWrapper)
+    assert(AwesomeGuildStore.ActivityLogWrapper)
+    assert(AwesomeGuildStore.KioskData)
+    assert(AwesomeGuildStore.StoreData)
+    assert(AwesomeGuildStore.KioskList)
+    assert(AwesomeGuildStore.StoreList)
+    assert(AwesomeGuildStore.OwnerList)
+    assert(AwesomeGuildStoreGuildTraders)
+    assert(AwesomeGuildStoreGuilds)
+    assert(AwesomeGuildStore.TraderListControl)
+    assert(AwesomeGuildStore.GuildListControl)
+    assert(AwesomeGuildStore.OwnerHistoryControl)
+    assert(AwesomeGuildStore.KioskHistoryControl)
+    assert(AwesomeGuildStore.InitializeGuildList)
+    assert(AwesomeGuildStore.InitializeGuildStoreList)
+    assert(AwesomeGuildStore.SalesCategorySelector)
+end
+
+do
+    -- workaround for insecure code errors due to the ZO_ItemSlotActionsController being lazily instantiated
+    HUD_SCENE:AddFragment(INVENTORY_FRAGMENT)
+    HUD_UI_SCENE:AddFragment(INVENTORY_FRAGMENT)
+
+    local original = ZO_CharacterWindowStats_HideComparisonValues
+    ZO_CharacterWindowStats_HideComparisonValues = ZO_InventorySlot_RemoveMouseOverKeybinds -- force the controller to be instantiated
+    ZO_PreHook("ZO_CharacterWindowStats_HideComparisonValues", function()
+        ZO_CharacterWindowStats_HideComparisonValues = original
+    end)
+
+    -- and clean up afterwards
+    local function OnStateChange(oldState, newState)
+        if newState == SCENE_SHOWN then
+            INVENTORY_FRAGMENT.control:SetHidden(true) -- make sure it doesn't show up
+            HUD_UI_SCENE:RemoveFragment(INVENTORY_FRAGMENT)
+            HUD_SCENE:RemoveFragment(INVENTORY_FRAGMENT)
+            HUD_UI_SCENE:UnregisterCallback("StateChange", OnStateChange)
+            HUD_SCENE:UnregisterCallback("StateChange", OnStateChange)
+        end
+    end
+    HUD_UI_SCENE:RegisterCallback("StateChange", OnStateChange)
+    HUD_SCENE:RegisterCallback("StateChange", OnStateChange)
+end
+
 OnAddonLoaded(function()
+    IntegrityCheck()
+
     local saveData = AwesomeGuildStore.LoadSettings()
     AwesomeGuildStore.SetMessagePrefix(saveData.shortMessagePrefix)
     if(saveData.guildTraderListEnabled) then

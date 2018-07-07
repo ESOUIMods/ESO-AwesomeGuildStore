@@ -28,7 +28,7 @@ function CategorySelector:New(parent, name, searchTabWrapper, tradingHouseWrappe
 	local container = parent:CreateControl(name .. "Container", CT_CONTROL)
 	container:SetAnchor(TOPLEFT, parent:GetNamedChild("Header"), TOPRIGHT, 70, -10)
 	container:SetResizeToFitDescendents(true)
-	ZO_TradingHouseItemPane:SetAnchor(TOPLEFT, container, BOTTOMLEFT, 0, 20)
+	ZO_TradingHouseItemPane:SetAnchor(TOPLEFT, container, BOTTOMLEFT, -50, 20)
 
 	selector.control = container
 	selector.group = {}
@@ -135,7 +135,9 @@ function CategorySelector:CreateSubcategory(name, category, categoryPreset)
 	if(#categoryPreset.subcategories == 0) then return end
 	local group = self:CreateSubcategoryGroup(name .. categoryPreset.name .. "Group", category)
 	for subcategory, preset in pairs(categoryPreset.subcategories) do
-		self:CreateSubcategoryButton(group, subcategory, preset)
+        if(not preset.hidden) then
+            self:CreateSubcategoryButton(group, subcategory, preset)
+        end
 	end
 end
 
@@ -272,8 +274,35 @@ function CategorySelector:Serialize()
 	return state
 end
 
+local function ConvertJewelryFilterState(values)
+    values[1] = ITEMFILTERTYPE_JEWELRY
+    values[2] = 1
+    for index, value in ipairs(values) do
+        if(index > 2) then
+            local subfilterId, state = zo_strsplit(",", value)
+            if(subfilterId == "17") then
+                if(state == "2") then
+                    values[2] = 2
+                elseif(state == "4") then
+                    values[2] = 3
+                end
+            end
+        end
+    end
+end
+
 function CategorySelector:Deserialize(state)
 	local values = {zo_strsplit(";", state)}
+
+    local category = tonumber(values[1])
+    if(category == ITEMFILTERTYPE_ARMOR and values[2] == "6") then
+        -- it's from the old jewelry subcategory
+        ConvertJewelryFilterState(values)
+    elseif(category == ITEMFILTERTYPE_CRAFTING and (values[2] == "8" or values[2] == "9")) then
+        -- it's from one of the old trait material subcategories
+        values[3] = (values[2] == "8") and "34,2" or "34,4"
+        values[2] = 13
+    end
 
 	for index, value in ipairs(values) do
 		if(index == 1) then

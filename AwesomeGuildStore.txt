@@ -1,7 +1,7 @@
 ## Title: AwesomeGuildStore
 ## Author: sirinsidiator
-## Version: 0.41.1
-## APIVersion: 100022
+## Version: 0.43
+## APIVersion: 100023
 ## OptionalDependsOn: LibStub LibAddonMenu-2.0 libFilters libCommonInventoryFilters LibTextFilter LibCustomTitles LibCustomMenu LibMapPing LibGPS LibDateTime LibPromises LibGetText LibAnnyoingUpdateNotificationInGame
 ## SavedVariables: AwesomeGuildStore_Data
 ##
