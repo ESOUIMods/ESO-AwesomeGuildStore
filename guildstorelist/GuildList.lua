@@ -1,15 +1,18 @@
-local IsUnitGuildKiosk = AwesomeGuildStore.IsUnitGuildKiosk
-local GetUnitGuildKioskOwner = AwesomeGuildStore.GetUnitGuildKioskOwner
-local IsLocationVisible = AwesomeGuildStore.IsLocationVisible
-local IsCurrentMapZoneMap = AwesomeGuildStore.IsCurrentMapZoneMap
-local GetKioskName = AwesomeGuildStore.GetKioskName
-local RegisterForEvent = AwesomeGuildStore.RegisterForEvent
-local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
+local AGS = AwesomeGuildStore
+
+local IsUnitGuildKiosk = AGS.internal.IsUnitGuildKiosk
+local IsLocationVisible = AGS.internal.IsLocationVisible
+local IsCurrentMapZoneMap = AGS.internal.IsCurrentMapZoneMap
+local RegisterForEvent = AGS.internal.RegisterForEvent
+local ShowGuildDetails = AGS.internal.ShowGuildDetails
+local gettext = AGS.internal.gettext
+local osdate = os.date
 
 local REFRESH_HANDLE = "AwesomeGuildStoreListRefresh"
 local REFRESH_INTERVAL = 15000
 
-local libGPS = LibStub("LibGPS2")
+local libGPS = LibGPS2
+local LDT = LibDateTime
 
 local menu = MAIN_MENU_KEYBOARD
 local category = MENU_CATEGORY_GUILDS
@@ -38,11 +41,13 @@ local function InjectGuildMenuTab(sceneName, categoryName, iconPathTemplate)
 end
 
 local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
-    local GetLastVisitLabel = AwesomeGuildStore.GetLastVisitLabel
-    local GetZoneLabel = AwesomeGuildStore.GetZoneLabel
-    local GetPoiLabel = AwesomeGuildStore.GetPoiLabel
-    local GetLastVisited = AwesomeGuildStore.GetLastVisited
-    local guildTradersFragment = ZO_FadeSceneFragment:New(AwesomeGuildStoreGuilds, nil, 0)
+    local window = AwesomeGuildStoreGuilds
+
+    local GetLastVisitLabel = AGS.internal.GetLastVisitLabel
+    local GetZoneLabel = AGS.internal.GetZoneLabel
+    local GetPoiLabel = AGS.internal.GetPoiLabel
+    local GetLastVisited = AGS.internal.GetLastVisited
+    local guildTradersFragment = ZO_FadeSceneFragment:New(window, nil, 0)
     local guildTradersScene = ZO_Scene:New(sceneName, SCENE_MANAGER)
     -- we use the title fragment for the separator line and show the actual title via the guild scene tab system
     -- in order to prevent titles from other scenes to show up, we clear it with an empty string
@@ -59,8 +64,6 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
 
     InjectGuildMenuTab(sceneName, SI_GUILD_TRADER_OWNERSHIP_HEADER, "EsoUI/Art/Guild/guildHistory_indexIcon_combat_%s.dds")
 
-    local window = AwesomeGuildStoreGuilds
-
     local headers = window:GetNamedChild("Headers")
     ZO_SortHeader_InitializeArrowHeader(headers:GetNamedChild("LastActive"), "lastActive", ZO_SORT_ORDER_UP)
     -- TRANSLATORS: sort header tooltip for the list on the guild kiosk tab
@@ -71,7 +74,7 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
     -- TRANSLATORS: sort header label for the list on the guild kiosk tab
     ZO_SortHeader_Initialize(headers:GetNamedChild("GuildName"), gettext("Guild"), "guildName", ZO_SORT_ORDER_UP, TEXT_ALIGN_LEFT, "ZoFontGameLargeBold")
 
-    local guildList = AwesomeGuildStore.GuildListControl:New(window, storeList, kioskList, ownerList)
+    local guildList = AGS.class.GuildListControl:New(window, storeList, kioskList, ownerList)
     window.guildList = guildList
 
     local r, g, b = ZO_TOOLTIP_DEFAULT_COLOR:UnpackRGB()
@@ -101,17 +104,72 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
     ZO_SortHeader_Initialize(historyHeaders:GetNamedChild("Trader"), gettext("Trader"), "trader", ZO_SORT_ORDER_UP, TEXT_ALIGN_LEFT, "ZoFontGameLargeBold")
     ZO_SortHeader_Initialize(historyHeaders:GetNamedChild("Location"), gettext("Location"), "location", ZO_SORT_ORDER_UP, TEXT_ALIGN_LEFT, "ZoFontGameLargeBold")
 
-    local historyList = AwesomeGuildStore.KioskHistoryControl:New(detailOwnerHistory, storeList, kioskList, ownerList)
+    local historyList = AGS.class.KioskHistoryControl:New(detailOwnerHistory, storeList, kioskList, ownerList)
     window.historyList = historyList
 
-    local LDT = LibStub("LibDateTime")
+    -- TRANSLATORS: label for a context menu entry for a row on the guild kiosk tab
+    local showDetailsLabel = gettext("Show Details")
+    -- TRANSLATORS: label for a context menu entry for a row on the guild kiosk tab
+    local showGuildDetailsLabel = gettext("Open Guild Info")
+
     local selectedTraderData
+    local function GoBack()
+        MAIN_MENU_KEYBOARD:ShowScene(sceneName)
+    end
+
+    local keybindStripDescriptor = {
+        alignment = KEYBIND_STRIP_ALIGN_CENTER,
+        {
+            name = showDetailsLabel,
+            keybind = "UI_SHORTCUT_PRIMARY",
+
+            callback = function()
+                AGS.internal.OpenTraderListOnKiosk(selectedTraderData.guild.lastKiosk)
+            end,
+
+            visible = function()
+                if(selectedTraderData and selectedTraderData.guild and selectedTraderData.guild.lastKiosk) then
+                    return true
+                end
+                return false
+            end
+        },
+        {
+            name = showGuildDetailsLabel,
+            keybind = "UI_SHORTCUT_SECONDARY",
+
+            callback = function()
+                ShowGuildDetails(selectedTraderData.guildId, GoBack)
+            end,
+
+            visible = function()
+                if(selectedTraderData and selectedTraderData.guildId) then
+                    return true
+                end
+                return false
+            end
+        },
+    }
+
+    local detailsGuildInfoButton = AGS.class.SimpleIconButton:New(details:GetNamedChild("GuildInfoButton"))
+    detailsGuildInfoButton:SetSize(48)
+    detailsGuildInfoButton:SetTextureTemplate("EsoUI/Art/SkillsAdvisor/advisor_tabIcon_tutorial_%s.dds")
+    -- TRANSLATORS: tooltip text for the open guild info button in the detail view on the guild kiosk tab
+    detailsGuildInfoButton:SetTooltipText(gettext("Open Guild Info"))
+    detailsGuildInfoButton:SetClickHandler(MOUSE_BUTTON_INDEX_LEFT, function()
+        if(selectedTraderData) then
+            ShowGuildDetails(selectedTraderData.guild.id, GoBack)
+        end
+    end)
+
     local function SetSelectedDetails(data)
         selectedTraderData = data
+        KEYBIND_STRIP:UpdateKeybindButtonGroup(keybindStripDescriptor)
 
         local guild = data.guild
         detailTraderName:SetText(guild.name)
-        historyList:SetSelectedGuild(guild.name)
+        detailsGuildInfoButton:SetHidden(not guild.id)
+        historyList:SetSelectedGuild(guild)
         historyList:RefreshData()
         detailKioskCount:SetText(historyList:GetKioskCount())
 
@@ -125,9 +183,9 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
                     data.lastVisitedLabel = GetLastVisitLabel(realLastVisited or lastVisited)
                 elseif(guild.lastVisitedWeek ~= 0) then
                     local yearA, weekA = LDT:SeparateIsoWeekAndYear(guild.lastVisitedWeek)
-                    local weekB, yearB = LDT:New():GetIsoWeek()
+                    local yearB, weekB = LDT:CalculateIsoWeekAndYear()
                     local diff = LDT:CalculateIsoWeekDifference(yearA, weekA, yearB, weekB)
-                    -- TRANSLATORS: text for the last visited label in the guild list detail view. $d is a placeholder for the number of weeks 
+                    -- TRANSLATORS: text for the last visited label in the guild list detail view. $d is a placeholder for the number of weeks
                     data.lastVisitedLabel = zo_strformat(gettext("<<1[this week/1 week ago/$d weeks ago]>>"), diff)
                 else
                     data.lastVisitedLabel = "-"
@@ -147,8 +205,7 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
 
     local function GetExactLastVisitLabel(lastVisited)
         if(lastVisited) then
-            local date = LDT:New(lastVisited)
-            return date:Format("%Y-%m-%d %H:%M")
+            return osdate("%F %H:%M", lastVisited)
         else
             -- TRANSLATORS: text for the last visited field of an unvisited kiosk on the guild kiosk tab
             return gettext("never")
@@ -166,15 +223,15 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
     end
     guildTradersScene.RefreshTraderList = RefreshTraderList
 
-    local function OpenListOnGuild(guildName)
+    local function OpenListOnGuild(guild)
         guildList:RefreshData()
-        local data = guildList:GetGuildEntryInList(guildName)
+        local data = guildList:GetGuildEntryInList(guild)
         if(data) then
             SetSelectedDetails(data)
         end
         MAIN_MENU_KEYBOARD:ShowScene(sceneName)
     end
-    AwesomeGuildStore.OpenGuildListOnGuild = OpenListOnGuild
+    AGS.internal.OpenGuildListOnGuild = OpenListOnGuild
 
     local function RegisterListUpdate()
         EVENT_MANAGER:RegisterForUpdate(REFRESH_HANDLE, REFRESH_INTERVAL, RefreshTraderList)
@@ -186,9 +243,11 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
 
     guildTradersScene:RegisterCallback("StateChange", function(oldState, newState)
         if(newState == SCENE_SHOWING) then
+            KEYBIND_STRIP:AddKeybindButtonGroup(keybindStripDescriptor)
             RefreshTraderList()
             RegisterListUpdate()
         elseif(newState == SCENE_HIDDEN) then
+            KEYBIND_STRIP:RemoveKeybindButtonGroup(keybindStripDescriptor)
             UnregisterListUpdate()
         end
     end)
@@ -198,7 +257,7 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
     local function OnMouseUp(control, button, upInside)
         if(upInside) then
             if(button == MOUSE_BUTTON_INDEX_RIGHT) then
-                --ShowTraderContextMenu(control)
+            --ShowTraderContextMenu(control)
             else
                 SetSelectedDetails(ZO_ScrollList_GetData(control))
             end
@@ -226,18 +285,18 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
         OnRowExit(control:GetParent())
     end
 
-    AwesomeGuildStore.GuildRow_OnMouseUp = OnMouseUp
-    AwesomeGuildStore.GuildRow_OnMouseEnter = OnRowEnter
-    AwesomeGuildStore.GuildRow_OnMouseExit = OnRowExit
-    AwesomeGuildStore.GuildRowField_OnMouseEnter = OnRowFieldEnter
-    AwesomeGuildStore.GuildRowField_OnMouseExit = OnRowFieldExit
+    AGS.internal.GuildRow_OnMouseUp = OnMouseUp
+    AGS.internal.GuildRow_OnMouseEnter = OnRowEnter
+    AGS.internal.GuildRow_OnMouseExit = OnRowExit
+    AGS.internal.GuildRowField_OnMouseEnter = OnRowFieldEnter
+    AGS.internal.GuildRowField_OnMouseExit = OnRowFieldExit
 
     -- mouse handlers for the trader history
 
     local function OnHistoryMouseUp(control, button, upInside)
         if(upInside) then
             local data = ZO_ScrollList_GetData(control)
-            AwesomeGuildStore.OpenTraderListOnKiosk(data.kioskName)
+            AGS.internal.OpenTraderListOnKiosk(data.kioskName)
         end
     end
 
@@ -269,15 +328,15 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
         OnHistoryRowEnter(control:GetParent())
     end
 
-    AwesomeGuildStore.GuildKioskHistoryRow_OnMouseUp = OnHistoryMouseUp
-    AwesomeGuildStore.GuildKioskHistoryRow_OnMouseEnter = OnHistoryRowEnter
-    AwesomeGuildStore.GuildKioskHistoryRow_OnMouseExit = OnHistoryRowExit
-    AwesomeGuildStore.GuildKioskHistoryRowWeek_OnMouseEnter = OnHistoryWeekEnter
-    AwesomeGuildStore.GuildKioskHistoryRowWeek_OnMouseExit = OnHistoryRowFieldExit
-    AwesomeGuildStore.GuildKioskHistoryRowTrader_OnMouseEnter = OnHistoryTraderEnter
-    AwesomeGuildStore.GuildKioskHistoryRowTrader_OnMouseExit = OnHistoryRowFieldExit
-    AwesomeGuildStore.GuildKioskHistoryRowLocation_OnMouseEnter = OnHistoryTraderEnter
-    AwesomeGuildStore.GuildKioskHistoryRowLocation_OnMouseExit = OnHistoryRowFieldExit
+    AGS.internal.GuildKioskHistoryRow_OnMouseUp = OnHistoryMouseUp
+    AGS.internal.GuildKioskHistoryRow_OnMouseEnter = OnHistoryRowEnter
+    AGS.internal.GuildKioskHistoryRow_OnMouseExit = OnHistoryRowExit
+    AGS.internal.GuildKioskHistoryRowWeek_OnMouseEnter = OnHistoryWeekEnter
+    AGS.internal.GuildKioskHistoryRowWeek_OnMouseExit = OnHistoryRowFieldExit
+    AGS.internal.GuildKioskHistoryRowTrader_OnMouseEnter = OnHistoryTraderEnter
+    AGS.internal.GuildKioskHistoryRowTrader_OnMouseExit = OnHistoryRowFieldExit
+    AGS.internal.GuildKioskHistoryRowLocation_OnMouseEnter = OnHistoryTraderEnter
+    AGS.internal.GuildKioskHistoryRowLocation_OnMouseExit = OnHistoryRowFieldExit
 
     -- mouse handlers for the stats
     local function OnUpToDateStatEnter(control)
@@ -302,11 +361,11 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
         ClearTooltip(InformationTooltip)
     end
 
-    AwesomeGuildStore.GuildKioskHistoryStatUpToDate_OnMouseEnter = OnUpToDateStatEnter
-    AwesomeGuildStore.GuildKioskHistoryStatVisited_OnMouseEnter = OnVisitedStatEnter
-    AwesomeGuildStore.GuildKioskHistoryStatOverall_OnMouseEnter = OnOverallStatEnter
-    AwesomeGuildStore.GuildKioskHistoryStat_OnMouseExit = OnStatExit
+    AGS.internal.GuildKioskHistoryStatUpToDate_OnMouseEnter = OnUpToDateStatEnter
+    AGS.internal.GuildKioskHistoryStatVisited_OnMouseEnter = OnVisitedStatEnter
+    AGS.internal.GuildKioskHistoryStatOverall_OnMouseEnter = OnOverallStatEnter
+    AGS.internal.GuildKioskHistoryStat_OnMouseExit = OnStatExit
 
     return guildTradersScene
 end
-AwesomeGuildStore.InitializeGuildList = InitializeGuildList
+AGS.internal.InitializeGuildList = InitializeGuildList

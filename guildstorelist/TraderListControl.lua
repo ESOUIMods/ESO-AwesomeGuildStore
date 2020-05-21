@@ -1,9 +1,12 @@
-local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
+local AGS = AwesomeGuildStore
+
+local gettext = AGS.internal.gettext
 
 local TRADER_DATA = 1
 local TRADER_ROW_HEIGHT = 30
 local TRADER_ROW_TEMPLATE = "AwesomeGuildStoreTraderRow"
 local REFRESH_FILTER_DELAY = 250
+local NO_OWNER = { name = "-" }
 
 local KIOSK_NOT_VISITED_COLOR = ZO_ColorDef:New("666666")
 local KIOSK_OUTDATED_COLOR = ZO_ColorDef:New("BCA09A")
@@ -28,7 +31,14 @@ local SORT_ORDER_DOWN = {
     [SORT_KEY_OWNER] = ZO_SORT_ORDER_DOWN,
 }
 
-local LTF = LibStub("LibTextFilter")
+local GET_SORT_VALUES = {
+    [SORT_KEY_LAST_VISITED] = function(a, b) return a.data[SORT_KEY_LAST_VISITED], b.data[SORT_KEY_LAST_VISITED] end,
+    [SORT_KEY_LOCATION] = function(a, b) return a.data[SORT_KEY_LOCATION], b.data[SORT_KEY_LOCATION] end,
+    [SORT_KEY_TRADER_NAME] = function(a, b) return a.data[SORT_KEY_TRADER_NAME], b.data[SORT_KEY_TRADER_NAME] end,
+    [SORT_KEY_OWNER] = function(a, b) return a.data[SORT_KEY_OWNER].name, b.data[SORT_KEY_OWNER].name end,
+}
+
+local LTF = LibTextFilter
 
 local function GetLastVisitLabel(lastVisited)
     if(lastVisited) then
@@ -38,13 +48,13 @@ local function GetLastVisitLabel(lastVisited)
         return "-"
     end
 end
-AwesomeGuildStore.GetLastVisitLabel = GetLastVisitLabel
+AGS.internal.GetLastVisitLabel = GetLastVisitLabel
 
 local function GetZoneLabel(store)
     local zoneIndex = GetZoneIndex(store.zoneId)
     return zo_strformat("<<1>>", GetZoneNameByIndex(zoneIndex))
 end
-AwesomeGuildStore.GetZoneLabel = GetZoneLabel
+AGS.internal.GetZoneLabel = GetZoneLabel
 
 local function GetPoiLabel(store)
     local location = store.mapName
@@ -54,7 +64,7 @@ local function GetPoiLabel(store)
     end
     return zo_strformat("<<t:1>>", location)
 end
-AwesomeGuildStore.GetPoiLabel = GetPoiLabel
+AGS.internal.GetPoiLabel = GetPoiLabel
 
 local function GetLastVisited(kiosk)
     if(not kiosk) then
@@ -65,10 +75,10 @@ local function GetLastVisited(kiosk)
         return kiosk.lastVisited
     end
 end
-AwesomeGuildStore.GetLastVisited = GetLastVisited
+AGS.internal.GetLastVisited = GetLastVisited
 
 local TraderListControl = ZO_SortFilterList:Subclass()
-AwesomeGuildStore.TraderListControl = TraderListControl
+AGS.class.TraderListControl = TraderListControl
 
 function TraderListControl:New(...)
     return ZO_SortFilterList.New(self, ...)
@@ -119,7 +129,7 @@ function TraderListControl:InitializeList(control, storeList, kioskList, ownerLi
         if(not data.isHired or not data.owner) then
             owner:SetText("-")
         else
-            owner:SetText(data.owner)
+            owner:SetText(data.owner.name)
         end
 
         local lastVisited = GetControl(control, "LastVisited")
@@ -143,7 +153,7 @@ function TraderListControl:InitializeList(control, storeList, kioskList, ownerLi
             t = 1
         end
 
-        local value1, value2 = listEntry1.data[sortKey], listEntry2.data[sortKey]
+        local value1, value2 = GET_SORT_VALUES[sortKey](listEntry1, listEntry2)
         if(value1 == value2 and type(value1) == type(value2)) then
             return SortTraders(listEntry1, listEntry2, t)
         elseif(self.currentSortOrder == SORT_ORDER_DOWN[sortKey]) then
@@ -216,7 +226,11 @@ function TraderListControl:BuildMasterList()
 
             local kiosk = kioskList:GetKiosk(traderName)
             local lastVisited, realLastVisited = GetLastVisited(kiosk)
-            local hasVisitedThisWeek = ownerList:IsTimeInCurrentWeek(lastVisited)
+            local hasVisitedThisWeek = false
+
+            if(lastVisited) then
+                hasVisitedThisWeek = ownerList:IsTimeInCurrentWeek(lastVisited)
+            end
 
             if(kiosk and kiosk.lastVisited and kiosk.lastVisited > 0) then
                 visitedCount = visitedCount + 1
@@ -235,14 +249,14 @@ function TraderListControl:BuildMasterList()
             haystack[1] = traderName
             haystack[2] = zoneName
             haystack[3] = poi
-            haystack[4] = owner
+            if(owner) then haystack[4] = owner.name end
             self.masterList[#self.masterList + 1] = {
                 type = TRADER_DATA,
                 traderName = traderName,
                 location = string.format("%s - %s", zoneName, poi),
                 zone = zoneName,
                 poi = poi,
-                owner = owner,
+                owner = owner or NO_OWNER,
                 storeIndex = store.index,
                 lastVisited = lastVisited,
                 hasVisitedThisWeek = hasVisitedThisWeek,

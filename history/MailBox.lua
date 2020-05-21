@@ -1,8 +1,10 @@
-AwesomeGuildStore.InitializeAugmentedMails = function(saveData)
+local AGS = AwesomeGuildStore
+
+AGS.internal.InitializeAugmentedMails = function(saveData)
 	if(not saveData.augementMails) then return end
-	local RegisterForEvent = AwesomeGuildStore.RegisterForEvent
-	local WrapFunction = AwesomeGuildStore.WrapFunction
-	local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
+	local RegisterForEvent = AGS.internal.RegisterForEvent
+	local WrapFunction = AGS.internal.WrapFunction
+	local gettext = AGS.internal.gettext
 
 	local iconMarkup = string.format("|t%u:%u:%s|t", 16, 16, "EsoUI/Art/currency/currency_gold.dds")
 	local positiveColor = ZO_ColorDef:New("00FF00")
@@ -12,7 +14,7 @@ AwesomeGuildStore.InitializeAugmentedMails = function(saveData)
 	local nextId = 1
 	local hasData = false
 	local currentMailTime = 0
-	local activityLog = AwesomeGuildStore.ActivityLogWrapper:New()
+	local guildHistory = AGS.class.GuildHistoryHelper:New()
 	local transactionDataByMailIdString = {}
 	local button
 
@@ -29,8 +31,8 @@ AwesomeGuildStore.InitializeAugmentedMails = function(saveData)
 		local potentialEvents = {}
 		for i = 1, GetNumGuilds() do
 			id = GetGuildId(i)
-			for j = 1, activityLog:GetNumPurchaseEvents(id) do
-				eventType, secsSinceEvent, sellerName, buyerName, itemCount, itemLink, sellPrice, tax = activityLog:GetPurchaseEvent(id, j)
+			for j = 1, guildHistory:GetNumPurchaseEvents(id) do
+				eventType, secsSinceEvent, sellerName, buyerName, itemCount, itemLink, sellPrice, tax = guildHistory:GetPurchaseEvent(id, j)
 				if(sellerName == playerName and math.abs(secsSinceEvent - secsSinceReceived) < 2) then
 					listingFee, houseCut, profit = GetTradingHousePostPriceInfo(sellPrice)
 					if (attachedMoney == 0 or attachedMoney == profit + listingFee) then
@@ -167,7 +169,7 @@ AwesomeGuildStore.InitializeAugmentedMails = function(saveData)
 		button:SetWidth(200)
 		button:SetHandler("OnMouseUp",function(control, button, isInside)
 			if(control:GetState() == BSTATE_NORMAL and button == 1 and isInside) then
-				if(not activityLog:RequestData(currentMailTime)) then
+				if(not guildHistory:RequestData(currentMailTime)) then
 					control:SetHidden(true)
 				end
 			end
@@ -228,7 +230,7 @@ AwesomeGuildStore.InitializeAugmentedMails = function(saveData)
 		if(transactionData) then
 			local buyerLink = neutralColor:Colorize(ZO_LinkHandler_CreateDisplayNameLink(transactionData.buyerName)):gsub("[%[%]]", "")
 			local itemCount = neutralColor:Colorize(transactionData.itemCount .. "x")
-			local sellPrice = neutralColor:Colorize(zo_strformat("<<1>> <<2>>", ZO_CurrencyControl_FormatCurrency(transactionData.sellPrice), iconMarkup))
+			local sellPrice = ZO_Currency_FormatPlatform(CURT_MONEY, transactionData.sellPrice, ZO_CURRENCY_FORMAT_AMOUNT_ICON)
 			-- TRANSLATORS: Mail body for item sold mails from the guild store. <<t:1>> is replaced by the itemlink, <<2>> by the item count, <<3>> by the buyer name and <<4>> by the sell price. e.g. You sold 1 Rosin to sirinsidiator for 5000g.  
 			return gettext("You sold <<2>> <<t:1>> to <<3>> for <<4>>.", transactionData.itemLink, itemCount, buyerLink, sellPrice)
 		else

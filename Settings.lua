@@ -1,48 +1,33 @@
+local AGS = AwesomeGuildStore
+
 local function LoadSettings()
-    local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
+
+    local gettext = AGS.internal.gettext
+
+    local info = {
+        fullVersion = "1.3.0.2481-beta",
+        version = "1.3.0-beta",
+        build = "2481",
+    }
+    AGS.info = info
+
     local defaultData = {
-        version = 23,
-        lastGuildName = "",
-        keepFiltersOnClose = true,
-        oldQualitySelectorBehavior = false,
-        displayPerUnitPrice = true,
-        keepSortOrderOnClose = true,
+        version = 26,
         listWithSingleClick = true,
-        sortWithoutSearch = false,
         showTraderTooltip = true,
         augementMails = true,
         mailAugmentationShowInvoice = false,
         purchaseNotification = true,
         cancelNotification = true,
         listedNotification = false,
-        sortField = TRADING_HOUSE_SORT_SALE_PRICE,
-        sortOrder = ZO_SORT_ORDER_UP,
-        listingSortField = AwesomeGuildStore.TRADING_HOUSE_SORT_LISTING_TIME,
+        listingSortField = AGS.internal.TRADING_HOUSE_SORT_LISTING_TIME,
         listingSortOrder = ZO_SORT_ORDER_DOWN,
         disableCustomSellTabFilter = false,
         skipGuildKioskDialog = true,
-        autoSearch = false,
-        skipEmptyPages = false,
-        searchLibrary = {
-            x = 980,
-            y = -5,
-            width = 730,
-            height = 185,
-            isActive = true,
-            lastState = "1:-:-:-:-:-",
-            searches = {},
-            showTooltips = true,
-            locked = true,
-            autoClearHistory = false,
-            favoritesSortField = "searches",
-            favoritesSortOrder = ZO_SORT_ORDER_DOWN,
-        },
         hasTouchedAction = {},
-        guildTraderListEnabled = false,
-        resetFiltersOnExit = false,
-        keepPurchasedResultsInList = true,
+        guildTraderListEnabled = true,
         minimizeChatOnOpen = true,
-        shortMessagePrefix = false
+        preferredBankerStoreTab = ZO_TRADING_HOUSE_MODE_SELL
     }
 
     local function RepairSaveData(saveData)
@@ -51,21 +36,24 @@ local function LoadSettings()
                 saveData[key] = value
             end
         end
-        for key, value in pairs(defaultData.searchLibrary) do
-            if(saveData.searchLibrary[key] == nil) then
-                saveData.searchLibrary[key] = value
-            end
-        end
     end
 
+    local DONATION_URL = "https://www.esoui.com/downloads/info695-AwesomeGuildStore.html#donate"
+    local function Donate()
+        RequestOpenUnsafeURL(DONATION_URL)
+    end
+    AwesomeGuildStore.internal.Donate = Donate
+
     local function CreateSettingsDialog(saveData)
-        local LAM = LibStub("LibAddonMenu-2.0")
+        local LAM = LibAddonMenu2
         local panelData = {
             type = "panel",
             name = "Awesome Guild Store",
             author = "sirinsidiator",
-            version = "0.43",
-            website = "http://www.esoui.com/downloads/info695-AwesomeGuildStore.html",
+            version = info.fullVersion,
+            website = "https://www.esoui.com/downloads/info695-AwesomeGuildStore.html",
+            feedback = "https://www.esoui.com/portal.php?id=218&a=bugreport",
+            donation = DONATION_URL,
             registerForRefresh = true,
             registerForDefaults = true
         }
@@ -74,44 +62,11 @@ local function LoadSettings()
         optionsData[#optionsData + 1] = {
             type = "checkbox",
             -- TRANSLATORS: label for an entry in the addon settings
-            name = gettext("Short prefix for chat messages"),
-            -- TRANSLATORS: tooltip text for an entry in the addon settings
-            tooltip = gettext("When activated, all chat messages will be prefixed with [AGS] instead of [AwesomeGuildStore]."),
-            getFunc = function() return saveData.shortMessagePrefix end,
-            setFunc = function(value)
-                saveData.shortMessagePrefix = value
-                AwesomeGuildStore.SetMessagePrefix(value)
-            end,
-            default = defaultData.shortMessagePrefix,
-        }
-        optionsData[#optionsData + 1] = {
-            type = "checkbox",
-            -- TRANSLATORS: label for an entry in the addon settings
-            name = gettext("Reset search filters on exit"),
-            -- TRANSLATORS: tooltip text for an entry in the addon settings
-            tooltip = gettext("When activated, all filters will reset when closing the trading house window. This mimics the old behavior of the store before ZOS changed it."),
-            getFunc = function() return saveData.resetFiltersOnExit end,
-            setFunc = function(value) saveData.resetFiltersOnExit = value end,
-            default = defaultData.resetFiltersOnExit,
-        }
-        optionsData[#optionsData + 1] = {
-            type = "checkbox",
-            -- TRANSLATORS: label for an entry in the addon settings
-            name = gettext("Keep purchased items in result list"),
-            -- TRANSLATORS: tooltip text for an entry in the addon settings
-            tooltip = gettext("When activated, purchased items will stay in the list and get marked as purchased instead, until you leave the page they are on or start a new search."),
-            getFunc = function() return saveData.keepPurchasedResultsInList end,
-            setFunc = function(value) saveData.keepPurchasedResultsInList = value end,
-            default = defaultData.keepPurchasedResultsInList,
-        }
-        optionsData[#optionsData + 1] = {
-            type = "checkbox",
-            -- TRANSLATORS: label for an entry in the addon settings
             name = gettext("Minimize chat on open"),
             -- TRANSLATORS: tooltip text for an entry in the addon settings
             tooltip = gettext("When activated, the chat window will get minimized when visiting a trading house. This defaults to true since it is the new default behavior added by ZOS."),
             getFunc = function() return saveData.minimizeChatOnOpen end,
-            setFunc = function(value) 
+            setFunc = function(value)
                 saveData.minimizeChatOnOpen = value
                 if(value) then
                     TRADING_HOUSE_SCENE:AddFragment(MINIMIZE_CHAT_FRAGMENT)
@@ -120,46 +75,6 @@ local function LoadSettings()
                 end
             end,
             default = defaultData.minimizeChatOnOpen,
-        }
-        optionsData[#optionsData + 1] = {
-            type = "checkbox",
-            -- TRANSLATORS: label for an entry in the addon settings
-            name = gettext("Use old quality selector behavior"),
-            -- TRANSLATORS: tooltip text for an entry in the addon settings
-            tooltip = gettext("When enabled left and right click set lower and upper quality and double or shift click sets both to the same value"),
-            getFunc = function() return saveData.oldQualitySelectorBehavior end,
-            setFunc = function(value) saveData.oldQualitySelectorBehavior = value end,
-            default = defaultData.oldQualitySelectorBehavior
-        }
-        optionsData[#optionsData + 1] = {
-            type = "checkbox",
-            -- TRANSLATORS: label for an entry in the addon settings
-            name = gettext("Show per unit price in search results"),
-            -- TRANSLATORS: tooltip text for an entry in the addon settings
-            tooltip = gettext("When enabled the results of a guild store search show the per unit price of a stack below the overall price"),
-            getFunc = function() return saveData.displayPerUnitPrice end,
-            setFunc = function(value) saveData.displayPerUnitPrice = value end,
-            default = defaultData.displayPerUnitPrice
-        }
-        optionsData[#optionsData + 1] = {
-            type = "checkbox",
-            -- TRANSLATORS: label for an entry in the addon settings
-            name = gettext("Select order without search"),
-            -- TRANSLATORS: tooltip text for an entry in the addon settings
-            tooltip = gettext("Allows you to change the sort order without triggering a new search. The currently shown results will only change after a manual search"),
-            getFunc = function() return saveData.sortWithoutSearch end,
-            setFunc = function(value) saveData.sortWithoutSearch = value end,
-            default = defaultData.sortWithoutSearch
-        }
-        optionsData[#optionsData + 1] = {
-            type = "checkbox",
-            -- TRANSLATORS: label for an entry in the addon settings
-            name = gettext("Remember sort order"),
-            -- TRANSLATORS: tooltip text for an entry in the addon settings
-            tooltip = gettext("Leaves the store sort order set between play sessions instead of clearing it."),
-            getFunc = function() return saveData.keepSortOrderOnClose end,
-            setFunc = function(value) saveData.keepSortOrderOnClose = value end,
-            default = defaultData.keepSortOrderOnClose
         }
         optionsData[#optionsData + 1] = {
             type = "checkbox",
@@ -174,32 +89,12 @@ local function LoadSettings()
         optionsData[#optionsData + 1] = {
             type = "checkbox",
             -- TRANSLATORS: label for an entry in the addon settings
-            name = gettext("Tooltips in Search Library"),
-            -- TRANSLATORS: tooltip text for an entry in the addon settings
-            tooltip = gettext("When active, a tooltip with details like level and quality is shown for each entry in the search library."),
-            getFunc = function() return saveData.searchLibrary.showTooltips end,
-            setFunc = function(value) saveData.searchLibrary.showTooltips = value end,
-            default = defaultData.searchLibrary.showTooltips
-        }
-        optionsData[#optionsData + 1] = {
-            type = "checkbox",
-            -- TRANSLATORS: label for an entry in the addon settings
             name = gettext("Trader Tooltips"),
             -- TRANSLATORS: tooltip text for an entry in the addon settings
             tooltip = gettext("Show the currently hired trader for a guild that you are a member of, when hovering over the name or an entry in the drop down menu"),
             getFunc = function() return saveData.showTraderTooltip end,
             setFunc = function(value) saveData.showTraderTooltip = value end,
             default = defaultData.showTraderTooltip
-        }
-        optionsData[#optionsData + 1] = {
-            type = "checkbox",
-            -- TRANSLATORS: label for an entry in the addon settings
-            name = gettext("Auto clear history"),
-            -- TRANSLATORS: tooltip text for an entry in the addon settings
-            tooltip = gettext("Automatically deletes all history entries when you open the guild store for the first time in a game session. You can undo the deletion via the menu in the search library"),
-            getFunc = function() return saveData.searchLibrary.autoClearHistory end,
-            setFunc = function(value) saveData.searchLibrary.autoClearHistory = value end,
-            default = defaultData.searchLibrary.autoClearHistory
         }
         optionsData[#optionsData + 1] = {
             type = "checkbox",
@@ -265,6 +160,26 @@ local function LoadSettings()
             requiresReload = true
         }
         optionsData[#optionsData + 1] = {
+            type = "dropdown",
+            -- TRANSLATORS: label for an entry in the addon settings
+            name = gettext("Preferred banker store tab"),
+            -- TRANSLATORS: tooltip text for an entry in the addon settings
+            tooltip = gettext("Controls which tab should be opened first when visiting the guild store at a banker."),
+            choices = {
+                GetString(SI_TRADING_HOUSE_MODE_BROWSE),
+                GetString(SI_TRADING_HOUSE_MODE_SELL),
+                GetString(SI_TRADING_HOUSE_MODE_LISTINGS),
+            },
+            choicesValues = {
+                ZO_TRADING_HOUSE_MODE_BROWSE,
+                ZO_TRADING_HOUSE_MODE_SELL,
+                ZO_TRADING_HOUSE_MODE_LISTINGS,
+            },
+            getFunc = function() return saveData.preferredBankerStoreTab end,
+            setFunc = function(value) saveData.preferredBankerStoreTab = value end,
+            default = defaultData.preferredBankerStoreTab,
+        }
+        optionsData[#optionsData + 1] = {
             type = "checkbox",
             -- TRANSLATORS: label for an entry in the addon settings
             name = gettext("Skip guild kiosk dialog"),
@@ -273,16 +188,6 @@ local function LoadSettings()
             getFunc = function() return saveData.skipGuildKioskDialog end,
             setFunc = function(value) saveData.skipGuildKioskDialog = value end,
             default = defaultData.skipGuildKioskDialog,
-        }
-        optionsData[#optionsData + 1] = {
-            type = "checkbox",
-            -- TRANSLATORS: label for an entry in the addon settings
-            name = gettext("Skip empty result pages"),
-            -- TRANSLATORS: tooltip text for an entry in the addon settings
-            tooltip = gettext("When activated, pages that show no results due to local filters will automatically trigger a search for the next page. This can be suppressed by holding the ctrl key before the results are returned."),
-            getFunc = function() return saveData.skipEmptyPages end,
-            setFunc = function(value) saveData.skipEmptyPages = value end,
-            default = defaultData.skipEmptyPages,
         }
         optionsData[#optionsData + 1] = {
             type = "button",
@@ -305,7 +210,7 @@ local function LoadSettings()
         optionsData[#optionsData + 1] = {
             type = "checkbox",
             -- TRANSLATORS: label for an entry in the addon settings
-            name = gettext("Enable guild trader list (BETA)"),
+            name = gettext("Enable guild trader list"),
             -- TRANSLATORS: tooltip text for an entry in the addon settings
             tooltip = gettext("When activated, the guild menu will show a new tab with a list of all kiosks in Tamriel. The list will get updated with the owning guilds whenever you visit a kiosk."),
             requiresReload = true,
@@ -332,94 +237,22 @@ local function LoadSettings()
         }
         LAM:RegisterOptionControls("AwesomeGuildStoreOptions", optionsData)
 
-        AwesomeGuildStore.OpenSettingsPanel = function()
+        AGS.OpenSettingsPanel = function()
             LAM:OpenToPanel(panel)
         end
     end
 
     local function UpgradeSettings(saveData)
-        if(saveData.version == 1) then
-            saveData.replaceQualityFilter = defaultData.replaceQualityFilter
-            saveData.replaceLevelFilter = defaultData.replaceLevelFilter
-            saveData.keepFiltersOnClose = defaultData.keepFiltersOnClose
-            saveData.version = 2
-        end
-        if(saveData.version == 2) then
-            saveData.replacePriceFilter = defaultData.replacePriceFilter
-            saveData.version = 3
-        end
-        if(saveData.version == 3) then
-            saveData.replaceCategoryFilter = defaultData.replaceCategoryFilter
-            saveData.version = 4
-        end
-        if(saveData.version == 4) then
-            saveData.lastState = defaultData.searchLibrary.lastState
-            saveData.version = 5
-        end
-        if(saveData.version == 5) then
-            saveData.searchLibrary = ZO_ShallowTableCopy(defaultData.searchLibrary)
-            saveData.searchLibrary.lastState = saveData.lastState
+        if(saveData.version <= 5) then
             saveData.lastState = nil
             saveData.version = 6
         end
-        if(saveData.version == 6) then
-            saveData.oldQualitySelectorBehavior = defaultData.oldQualitySelectorBehavior
-            saveData.version = 7
-        end
-        if(saveData.version == 7) then
-            saveData.displayPerUnitPrice = defaultData.displayPerUnitPrice
-            saveData.searchLibrary.width = defaultData.searchLibrary.width
-            saveData.searchLibrary.height = defaultData.searchLibrary.height
-            saveData.version = 8
-        end
-        if(saveData.version <= 9) then
-            saveData.lastGuildName = saveData.lastGuildName or defaultData.lastGuildName
-            saveData.version = 10
-        end
-        if(saveData.version == 10) then
-            saveData.keepSortOrderOnClose = defaultData.keepSortOrderOnClose
-            saveData.sortField = defaultData.sortField
-            saveData.sortOrder = defaultData.sortOrder
-            saveData.listWithSingleClick = defaultData.listWithSingleClick
-            saveData.searchLibrary.showTooltips = defaultData.searchLibrary.showTooltips
-            saveData.sortWithoutSearch = defaultData.sortWithoutSearch
-            saveData.showTraderTooltip = defaultData.showTraderTooltip
-            saveData.searchLibrary.locked = defaultData.searchLibrary.locked
-            saveData.searchLibrary.autoClearHistory = defaultData.searchLibrary.autoClearHistory
-            saveData.version = 11
-        end
-        if(saveData.version == 11) then
-            saveData.listingSortField = defaultData.listingSortField
-            saveData.listingSortOrder = defaultData.listingSortOrder
+        if(saveData.version <= 11) then
             saveData.replaceCategoryFilter = nil
             saveData.replacePriceFilter = nil
             saveData.replaceQualityFilter = nil
             saveData.replaceLevelFilter = nil
             saveData.version = 12
-        end
-        if(saveData.version == 12) then
-            saveData.augementMails = defaultData.augementMails
-            saveData.version = 13
-        end
-        if(saveData.version == 13) then
-            saveData.purchaseNotification = defaultData.purchaseNotification
-            saveData.version = 14
-        end
-        if(saveData.version == 14) then
-            saveData.skipGuildKioskDialog = defaultData.skipGuildKioskDialog
-            saveData.version = 15
-        end
-        if(saveData.version == 15) then
-            saveData.cancelNotification = defaultData.cancelNotification
-            saveData.listedNotification = defaultData.listedNotification
-            saveData.version = 16
-        end
-        if(saveData.version == 16) then
-            saveData.searchLibrary.favoritesSortField = defaultData.searchLibrary.favoritesSortField
-            saveData.searchLibrary.favoritesSortOrder = defaultData.searchLibrary.favoritesSortOrder
-            if(saveData.autoSearch == nil) then saveData.autoSearch = defaultData.autoSearch end
-            saveData.skipEmptyPages = defaultData.skipEmptyPages
-            saveData.version = 17
         end
         if(saveData.version <= 19) then
             local hasTouchedAction = {}
@@ -451,26 +284,50 @@ local function LoadSettings()
             end
             saveData.version = 20
         end
-        if(saveData.version == 20) then
-            saveData.guildTraderListEnabled = defaultData.guildTraderListEnabled
-            saveData.version = 21
+        if(saveData.version <= 23) then
+            saveData.keepFiltersOnClose = nil
+            saveData.oldQualitySelectorBehavior = nil
+            saveData.displayPerUnitPrice = nil
+            saveData.keepSortOrderOnClose = nil
+            saveData.sortWithoutSearch = nil
+            saveData.sortField = nil
+            saveData.sortOrder = nil
+            saveData.autoSearch = nil
+            saveData.skipEmptyPages = nil
+            saveData.searchLibrary = nil
+            saveData.resetFiltersOnExit = nil
+            saveData.keepPurchasedResultsInList = nil
+            saveData.guildTraderListEnabled = true
+            saveData.version = 24
         end
-        if(saveData.version == 21) then
-            saveData.resetFiltersOnExit = defaultData.resetFiltersOnExit
-            saveData.keepPurchasedResultsInList = defaultData.keepPurchasedResultsInList
-            saveData.minimizeChatOnOpen = defaultData.minimizeChatOnOpen
-            saveData.version = 22
+        if(saveData.version <= 24) then
+            saveData.lastGuildName = nil
+            saveData.preferredBankerStoreTab = defaultData.preferredBankerStoreTab
+            saveData.version = 25
         end
-        if(saveData.version == 22) then
-            saveData.shortMessagePrefix = defaultData.shortMessagePrefix
-            saveData.version = 23
+        if(saveData.version <= 25) then
+            saveData.shortMessagePrefix = nil
+            saveData.version = 26
         end
     end
 
     AwesomeGuildStore_Data = AwesomeGuildStore_Data or {}
-    local saveData = AwesomeGuildStore_Data[GetDisplayName()] or ZO_DeepTableCopy(defaultData)
-    AwesomeGuildStore_Data[GetDisplayName()] = saveData
-    AwesomeGuildStore.defaultData = defaultData
+    local name = GetDisplayName()
+    local world = GetWorldName()
+    local key = world .. name
+
+    -- migrate old data
+    if(not AwesomeGuildStore_Data[key] and AwesomeGuildStore_Data[name]) then
+        AwesomeGuildStore_Data[key] = AwesomeGuildStore_Data[name]
+        AwesomeGuildStore_Data[name] = nil
+    end
+
+    AwesomeGuildStore_Data.guilds = AwesomeGuildStore_Data.guilds or {}
+    AGS.internal.guildIdMapping = AGS.class.GuildIdMapping:New(AwesomeGuildStore_Data.guilds, world)
+
+    local saveData = AwesomeGuildStore_Data[key] or ZO_DeepTableCopy(defaultData)
+    AwesomeGuildStore_Data[key] = saveData
+    AGS.data.DEFAULT_SETTINGS = defaultData
 
     UpgradeSettings(saveData)
     RepairSaveData(saveData)
@@ -480,4 +337,4 @@ local function LoadSettings()
     return saveData
 end
 
-AwesomeGuildStore.LoadSettings = LoadSettings
+AGS.internal.LoadSettings = LoadSettings

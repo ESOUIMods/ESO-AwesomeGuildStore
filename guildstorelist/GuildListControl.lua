@@ -1,4 +1,6 @@
-local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
+local AGS = AwesomeGuildStore
+
+local gettext = AGS.internal.gettext
 
 local TRADER_DATA = 1
 local TRADER_ROW_HEIGHT = 30
@@ -27,34 +29,11 @@ local SORT_ORDER_DOWN = {
     [SORT_KEY_LAST_ACTIVE] = ZO_SORT_ORDER_DOWN,
 }
 
-local LTF = LibStub("LibTextFilter")
-
-local function GetZoneLabel(store)
-    local zoneIndex = GetZoneIndex(store.zoneId)
-    return zo_strformat("<<1>>", GetZoneNameByIndex(zoneIndex))
-end
-
-local function GetPoiLabel(store)
-    local location = store.mapName
-    if(store.onZoneMap) then
-        local zoneIndex = GetZoneIndex(store.zoneId)
-        location = GetPOIInfo(zoneIndex, store.wayshrineIndex)
-    end
-    return zo_strformat("<<t:1>>", location)
-end
-
-local function GetLastVisited(kiosk)
-    if(not kiosk) then
-        return
-    elseif(kiosk.isMember) then
-        return kiosk.lastVisited * 10, kiosk.lastVisited -- small hack to get the entry to the top when sorting by time
-    elseif(kiosk.lastVisited and kiosk.lastVisited > 0) then
-        return kiosk.lastVisited
-    end
-end
+local LTF = LibTextFilter
+local LDT = LibDateTime
 
 local GuildListControl = ZO_SortFilterList:Subclass()
-AwesomeGuildStore.GuildListControl = GuildListControl
+AGS.class.GuildListControl = GuildListControl
 
 function GuildListControl:New(...)
     return ZO_SortFilterList.New(self, ...)
@@ -171,8 +150,7 @@ function GuildListControl:BuildMasterList()
     ZO_ClearNumericallyIndexedTable(self.masterList)
     self:UpdateEmptyText()
 
-    local LDT = LibStub("LibDateTime")
-    local weekB, yearB = LDT:New():GetIsoWeek()
+    local yearB, weekB = LDT:CalculateIsoWeekAndYear()
 
     local upToDateCount = 0
     local visitedCount = 0
@@ -180,10 +158,10 @@ function GuildListControl:BuildMasterList()
 
     local haystack = {}
     local length = 0
-    for guildName, guild in pairs(ownerList:GetAllGuilds()) do
+    for _, guild in pairs(ownerList:GetAllGuilds()) do
         overallCount = overallCount + 1
 
-        haystack[1] = guildName
+        haystack[1] = guild.name
         length = 1
         for kiosk in pairs(guild.kiosks) do
             length = length + 1
@@ -196,7 +174,8 @@ function GuildListControl:BuildMasterList()
         self.masterList[#self.masterList + 1] = {
             type = TRADER_DATA,
             guild = guild,
-            guildName = guildName,
+            guildId = guild.id,
+            guildName = guild.name,
             kioskCount = guild.numKiosks,
             kioskCountInv = guild.numKiosks,
             lastActive = diff,
@@ -258,10 +237,10 @@ function GuildListControl:GetFirstGuildEntryInList()
     end
 end
 
-function GuildListControl:GetGuildEntryInList(guildName)
+function GuildListControl:GetGuildEntryInList(guild)
     for i = 1, #self.masterList do
         local data = self.masterList[i]
-        if(data.guildName == guildName) then
+        if(data.guildId == guild.id or data.guildName == guild.name) then
             return data
         end
     end

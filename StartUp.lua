@@ -1,6 +1,22 @@
 local ADDON_NAME = "AwesomeGuildStore"
 
-AwesomeGuildStore = ZO_CallbackObject:New()
+local callbackObject = ZO_CallbackObject:New()
+local AGS = {
+    class = {},
+    data = {},
+    callback = {},
+    internal = {
+        callbackObject = callbackObject,
+        logger = LibDebugLogger(ADDON_NAME),
+        chat = LibChatMessage(ADDON_NAME, "AGS"),
+        gettext = LibGetText(ADDON_NAME).gettext
+    }
+}
+_G[ADDON_NAME] = AGS
+
+function AGS.internal:FireCallbacks(...)
+    return callbackObject:FireCallbacks(...)
+end
 
 local nextEventHandleIndex = 1
 
@@ -34,209 +50,186 @@ local function OnAddonLoaded(callback)
     end)
 end
 
-AwesomeGuildStore.UnregisterForEvent = UnregisterForEvent
-AwesomeGuildStore.RegisterForEvent = RegisterForEvent
-AwesomeGuildStore.WrapFunction = WrapFunction
+AGS.internal.UnregisterForEvent = UnregisterForEvent
+AGS.internal.RegisterForEvent = RegisterForEvent
+AGS.internal.WrapFunction = WrapFunction
 -----------------------------------------------------------------------------------------
-
-AwesomeGuildStore.GetAPIVersion = function() return 3 end
-
--- convenience functions for using the callback object:
-function AwesomeGuildStore:RegisterBeforeInitialSetupCallback(...)
-    self:RegisterCallback("BeforeInitialSetup", ...)
-end
-function AwesomeGuildStore:FireBeforeInitialSetupCallbacks(...)
-    self:FireCallbacks("BeforeInitialSetup", ...)
-end
-
-function AwesomeGuildStore:RegisterAfterInitialSetupCallback(...)
-    self:RegisterCallback("AfterInitialSetup", ...)
-end
-function AwesomeGuildStore:FireAfterInitialSetupCallbacks(...)
-    self:FireCallbacks("AfterInitialSetup", ...)
-end
-
-function AwesomeGuildStore:RegisterOnOpenSearchTabCallback(...)
-    self:RegisterCallback("OnOpenSearchTab", ...)
-end
-function AwesomeGuildStore:FireOnOpenSearchTabCallbacks(...)
-    self:FireCallbacks("OnOpenSearchTab", ...)
-end
-
-function AwesomeGuildStore:RegisterOnCloseSearchTabCallback(...)
-    self:RegisterCallback("OnCloseSearchTab", ...)
-end
-function AwesomeGuildStore:FireOnCloseSearchTabCallbacks(...)
-    self:FireCallbacks("OnCloseSearchTab", ...)
-end
-
-function AwesomeGuildStore:RegisterOnInitializeFiltersCallback(...)
-    self:RegisterCallback("OnInitializeFilters", ...)
-end
-function AwesomeGuildStore:FireOnInitializeFiltersCallbacks(...)
-    self:FireCallbacks("OnInitializeFilters", ...)
-end
-
--- deprecated callback names for CALLBACK_MANAGER:
-AwesomeGuildStore.BeforeInitialSetupCallbackName = ADDON_NAME .. "_BeforeInitialSetup"
-AwesomeGuildStore.AfterInitialSetupCallbackName = ADDON_NAME .. "_AfterInitialSetup"
-AwesomeGuildStore.OnOpenSearchTabCallbackName = ADDON_NAME .. "_OnOpenSearchTab"
-AwesomeGuildStore.OnCloseSearchTabCallbackName = ADDON_NAME .. "_OnCloseSearchTab"
-AwesomeGuildStore.OnInitializeFiltersCallbackName = ADDON_NAME .. "_OnInitializeFilters"
-
--- compatibility layer for old callback handling:
-AwesomeGuildStore:RegisterBeforeInitialSetupCallback(function(...) CALLBACK_MANAGER:FireCallbacks(AwesomeGuildStore.BeforeInitialSetupCallbackName, ...) end)
-AwesomeGuildStore:RegisterAfterInitialSetupCallback(function(...) CALLBACK_MANAGER:FireCallbacks(AwesomeGuildStore.AfterInitialSetupCallbackName, ...) end)
-AwesomeGuildStore:RegisterOnOpenSearchTabCallback(function(...) CALLBACK_MANAGER:FireCallbacks(AwesomeGuildStore.OnOpenSearchTabCallbackName, ...) end)
-AwesomeGuildStore:RegisterOnCloseSearchTabCallback(function(...) CALLBACK_MANAGER:FireCallbacks(AwesomeGuildStore.OnCloseSearchTabCallbackName, ...) end)
-AwesomeGuildStore:RegisterOnInitializeFiltersCallback(function(...) CALLBACK_MANAGER:FireCallbacks(AwesomeGuildStore.OnInitializeFiltersCallbackName, ...) end)
-
-do
-    local LONG_PREFIX = "AwesomeGuildStore"
-    local SHORT_PREFIX = "AGS"
-
-    local prefix = LONG_PREFIX
-    local function SetMessagePrefix(isShort)
-        prefix = isShort and SHORT_PREFIX or LONG_PREFIX
-    end
-
-    local function Print(message, ...)
-        if(select("#", ...) > 0) then
-            message = message:format(...)
-        end
-        df("[%s] %s", prefix, message)
-    end
-
-    AwesomeGuildStore.Print = Print
-    AwesomeGuildStore.SetMessagePrefix = SetMessagePrefix
-end
 
 local function IsSameAction(actionName, layerIndex, categoryIndex, actionIndex)
     local targetTayerIndex, targetCategoryIndex, targetActionIndex = GetActionIndicesFromName(actionName)
     return not (layerIndex ~= targetTayerIndex or categoryIndex ~= targetCategoryIndex or actionIndex ~= targetActionIndex)
 end
 
+local integrityCheckList = {
+    ["API.lua"] = function() return AGS.GetAPIVersion ~= nil end,
+    ["CallbackNames.lua"] = function() return AGS.callback.BEFORE_INITIAL_SETUP ~= nil end,
+    ["i18n/en.lua"] = function() return next(LibGetText(ADDON_NAME).dict) ~= nil end,
+    ["Settings.lua"] = function() return AGS.internal.LoadSettings ~= nil end,
+    ["util/misc.lua"] = function() return AGS.internal.IsUnitGuildKiosk ~= nil end,
+    ["util/Codec.lua"] = function() return AGS.internal.EncodeValue ~= nil end,
+    ["util/EditControlGroup.lua"] = function() return AGS.class.EditControlGroup ~= nil end,
+    ["data/ItemRequirementLevelRanges.lua"] = function() return AGS.data.ITEM_REQUIREMENT_RANGE ~= nil end,
+    ["util/ItemRequirementLevel.lua"] = function() return AGS.internal.GetNormalizedLevel ~= nil end,
+    ["util/ItemEnchantSearchCategory.lua"] = function() return AGS.internal.GetItemLinkEnchantSearchCategory ~= nil end,
+    ["util/ItemLinkUtils.lua"] = function() return AGS.internal.IsItemLinkCraftedAllTypes ~= nil end,
+    ["templates/MinMaxRangeSlider.xml"] = function() return AwesomeGuildStoreMinMaxRangeSliderTemplateLoaded ~= nil end,
+    ["templates/MinMaxRangeSlider.lua"] = function() return AGS.class.MinMaxRangeSlider ~= nil end,
+    ["templates/SimpleIconButton.lua"] = function() return AGS.class.SimpleIconButton ~= nil end,
+    ["templates/SimpleInputBox.xml"] = function() return AwesomeGuildStoreSimpleInputBoxPulse ~= nil end,
+    ["templates/SimpleInputBox.lua"] = function() return AGS.class.SimpleInputBox ~= nil end,
+    ["util/ButtonGroup.lua"] = function() return AGS.class.ButtonGroup ~= nil end,
+    ["util/ToggleButton.lua"] = function() return AGS.class.ToggleButton ~= nil end,
+    ["util/LoadingOverlay.lua"] = function() return AGS.class.LoadingIcon ~= nil end,
+    ["history/GuildHistoryHelper.lua"] = function() return AGS.class.GuildHistoryHelper ~= nil end,
+    ["history/MailBox.lua"] = function() return AGS.internal.InitializeAugmentedMails ~= nil end,
+    ["guildselector/HiredTraderTooltip.lua"] = function() return AGS.class.HiredTraderTooltip ~= nil end,
+    ["guildselector/GuildSelector.lua"] = function() return AGS.class.GuildSelector ~= nil end,
+    ["guildselector/GuildSelector.xml"] = function() return AwesomeGuildStoreGuildSelectorTemplateLoaded ~= nil end,
+    ["backend/sort/SortOrderBase.lua"] = function() return AGS.class.SortOrderBase ~= nil end,
+    ["data/CategoryDefinitions.lua"] = function() return AGS.data.CATEGORY_ID ~= nil end,
+    ["backend/activity/ActivityBase.lua"] = function() return AGS.class.ActivityBase ~= nil end,
+    ["backend/activity/RequestSearchActivity.lua"] = function() return AGS.class.RequestSearchActivity ~= nil end,
+    ["backend/activity/RequestNewestActivity.lua"] = function() return AGS.class.RequestNewestActivity ~= nil end,
+    ["backend/activity/RequestListingsActivity.lua"] = function() return AGS.class.RequestListingsActivity ~= nil end,
+    ["backend/activity/PostItemActivity.lua"] = function() return AGS.class.PostItemActivity ~= nil end,
+    ["backend/activity/PurchaseItemActivity.lua"] = function() return AGS.class.PurchaseItemActivity ~= nil end,
+    ["backend/activity/CancelItemActivity.lua"] = function() return AGS.class.CancelItemActivity ~= nil end,
+    ["backend/activity/FetchGuildItemsActivity.lua"] = function() return AGS.class.FetchGuildItemsActivity ~= nil end,
+    ["frontend/ActivityWindow.xml"] = function() return AwesomeGuildStoreActivityWindow ~= nil end,
+    ["frontend/ActivityWindow.lua"] = function() return AGS.class.ActivityWindow ~= nil end,
+    ["frontend/StatusLine.xml"] = function() return AwesomeGuildStoreActivityStatusLineTemplateLoaded ~= nil end,
+    ["frontend/StatusLine.lua"] = function() return AGS.class.StatusLine ~= nil end,
+    ["backend/activity/ActivityManager.lua"] = function() return AGS.class.ActivityManager ~= nil end,
+    ["data/FilterIds.lua"] = function() return AGS.data.FILTER_ID ~= nil end,
+    ["data/SortOrderIds.lua"] = function() return AGS.data.SORT_ORDER_ID ~= nil end,
+    ["data/FurnitureCategoryFilterData.lua"] = function() return AGS.data.FURNITURE_CATEGORIES ~= nil end,
+    ["data/ItemStyleFilterData.lua"] = function() return AGS.data.STYLE_CATEGORIES ~= nil end,
+    ["data/ItemTraitFilterData.lua"] = function() return AGS.data.WEAPON_TRAIT_FILTER ~= nil end,
+    ["data/ItemEnchantmentFilterData.lua"] = function() return AGS.data.WEAPON_ENCHANTMENT_FILTER ~= nil end,
+    ["data/WeaponTypeFilterData.lua"] = function() return AGS.data.ONE_HANDED_WEAPON_TYPE_FILTER ~= nil end,
+    ["data/EquipTypeFilterData.lua"] = function() return AGS.data.ARMOR_EQUIP_TYPE_FILTER ~= nil end,
+    ["data/CraftingMaterialTypeFilterData.lua"] = function() return AGS.data.BLACKSMITHING_MATERIAL_TYPE_FILTER ~= nil end,
+    ["data/ItemTypeFilterData.lua"] = function() return AGS.data.GLYPH_TYPE_FILTER ~= nil end,
+    ["data/WritTypeFilterData.lua"] = function() return AGS.data.MASTER_WRIT_TYPE ~= nil end,
+    ["backend/filter/FilterBase.lua"] = function() return AGS.class.FilterBase ~= nil end,
+    ["backend/FilterState.lua"] = function() return AGS.class.FilterState ~= nil end,
+    ["backend/database/ItemData.lua"] = function() return AGS.class.ItemData ~= nil end,
+    ["backend/database/view/BaseItemDatabaseView.lua"] = function() return AGS.class.BaseItemDatabaseView ~= nil end,
+    ["backend/database/view/ItemDatabaseGuildView.lua"] = function() return AGS.class.ItemDatabaseGuildView ~= nil end,
+    ["backend/database/view/ItemDatabaseFilterView.lua"] = function() return AGS.class.ItemDatabaseFilterView ~= nil end,
+    ["backend/database/ItemDatabase.lua"] = function() return AGS.class.ItemDatabase ~= nil end,
+    ["backend/sort/SortOrderTimeLeft.lua"] = function() return AGS.class.SortOrderTimeLeft ~= nil end,
+    ["backend/sort/SortOrderPurchasePrice.lua"] = function() return AGS.class.SortOrderPurchasePrice ~= nil end,
+    ["backend/sort/SortOrderUnitPrice.lua"] = function() return AGS.class.SortOrderUnitPrice ~= nil end,
+    ["backend/sort/SortOrderItemName.lua"] = function() return AGS.class.SortOrderItemName ~= nil end,
+    ["backend/sort/SortOrderSellerName.lua"] = function() return AGS.class.SortOrderSellerName ~= nil end,
+    ["backend/sort/SortOrderSetName.lua"] = function() return AGS.class.SortOrderSetName ~= nil end,
+    ["backend/sort/SortOrderItemQuality.lua"] = function() return AGS.class.SortOrderItemQuality ~= nil end,
+    ["backend/filter/ValueRangeFilterBase.lua"] = function() return AGS.class.ValueRangeFilterBase ~= nil end,
+    ["backend/filter/MultiChoiceFilterBase.lua"] = function() return AGS.class.MultiChoiceFilterBase ~= nil end,
+    ["backend/filter/SortFilter.lua"] = function() return AGS.class.SortFilter ~= nil end,
+    ["backend/filter/ItemCategoryFilter.lua"] = function() return AGS.class.ItemCategoryFilter ~= nil end,
+    ["backend/filter/PriceFilter.lua"] = function() return AGS.class.PriceFilter ~= nil end,
+    ["backend/filter/LevelFilter.lua"] = function() return AGS.class.LevelFilter ~= nil end,
+    ["backend/filter/UnitPriceFilter.lua"] = function() return AGS.class.UnitPriceFilter ~= nil end,
+    ["backend/filter/QualityFilter.lua"] = function() return AGS.class.QualityFilter ~= nil end,
+    ["backend/filter/TextFilter.lua"] = function() return AGS.class.TextFilter ~= nil end,
+    ["backend/filter/ItemStyleFilter.lua"] = function() return AGS.class.ItemStyleFilter ~= nil end,
+    ["backend/filter/GenericTradingHouseFilter.lua"] = function() return AGS.class.GenericTradingHouseFilter ~= nil end,
+    ["backend/filter/RecipeKnowledgeFilter.lua"] = function() return AGS.class.RecipeKnowledgeFilter ~= nil end,
+    ["backend/filter/MotifKnowledgeFilter.lua"] = function() return AGS.class.MotifKnowledgeFilter ~= nil end,
+    ["backend/filter/TraitKnowledgeFilter.lua"] = function() return AGS.class.TraitKnowledgeFilter ~= nil end,
+    ["backend/filter/RuneKnowledgeFilter.lua"] = function() return AGS.class.RuneKnowledgeFilter ~= nil end,
+    ["backend/filter/ItemSetFilter.lua"] = function() return AGS.class.ItemSetFilter ~= nil end,
+    ["backend/filter/CraftedItemFilter.lua"] = function() return AGS.class.CraftedItemFilter ~= nil end,
+    ["backend/filter/SkillRequirementsFilter.lua"] = function() return AGS.class.SkillRequirementsFilter ~= nil end,
+    ["backend/filter/WritVoucherFilter.lua"] = function() return AGS.class.WritVoucherFilter ~= nil end,
+    ["backend/filter/FurnitureCategoryFilter.lua"] = function() return AGS.class.FurnitureCategoryFilter ~= nil end,
+    ["backend/filter/CollectibleOwnershipFilter.lua"] = function() return AGS.class.CollectibleOwnershipFilter ~= nil end,
+    ["backend/SearchState.lua"] = function() return AGS.class.SearchState ~= nil end,
+    ["backend/SearchPageHistory.lua"] = function() return AGS.class.SearchPageHistory ~= nil end,
+    ["backend/SearchManager.lua"] = function() return AGS.class.SearchManager ~= nil end,
+    ["backend/GuildSelection.lua"] = function() return AGS.class.GuildSelection ~= nil end,
+    ["backend/ItemNameMatcher.lua"] = function() return AGS.class.ItemNameMatcher ~= nil end,
+    ["backend/GuildIdMapping.lua"] = function() return AGS.class.GuildIdMapping ~= nil end,
+    ["frontend/SearchList.xml"] = function() return AwesomeGuildStoreSearchListContainer ~= nil end,
+    ["frontend/SearchList.lua"] = function() return AGS.class.SearchList ~= nil end,
+    ["frontend/SearchResultListWrapper.lua"] = function() return AGS.class.SearchResultListWrapper ~= nil end,
+    ["frontend/CategorySelector.xml"] = function() return AwesomeGuildStoreCategorySelectorTemplateLoaded ~= nil end,
+    ["frontend/CategorySelector.lua"] = function() return AGS.class.CategorySelector ~= nil end,
+    ["frontend/FilterFragment.xml"] = function() return AwesomeGuildStoreFilterFragmentTemplateLoaded ~= nil end,
+    ["frontend/FilterFragment.lua"] = function() return AGS.class.FilterFragment ~= nil end,
+    ["frontend/FilterArea.lua"] = function() return AGS.class.FilterArea ~= nil end,
+    ["frontend/filter/ValueRangeFilterFragmentBase.lua"] = function() return AGS.class.ValueRangeFilterFragmentBase ~= nil end,
+    ["frontend/filter/PriceRangeFilterFragment.xml"] = function() return AwesomeGuildStorePriceInputTemplateLoaded ~= nil end,
+    ["frontend/filter/PriceRangeFilterFragment.lua"] = function() return AGS.class.PriceRangeFilterFragment ~= nil end,
+    ["frontend/filter/LevelRangeFilterFragment.xml"] = function() return AwesomeGuildStoreLevelInputTemplateLoaded ~= nil end,
+    ["frontend/filter/LevelRangeFilterFragment.lua"] = function() return AGS.class.LevelRangeFilterFragment ~= nil end,
+    ["frontend/filter/QualityFilterFragment.lua"] = function() return AGS.class.QualityFilterFragment ~= nil end,
+    ["frontend/filter/TextFilterFragment.xml"] = function() return AwesomeGuildStoreTextSearchInputTemplateLoaded ~= nil end,
+    ["frontend/filter/TextFilterFragment.lua"] = function() return AGS.class.TextFilterFragment ~= nil end,
+    ["frontend/filter/MultiCategoryFilterFragment.xml"] = function() return AwesomeGuildStoreMultiCategoryFilterRowTemplateLoaded ~= nil end,
+    ["frontend/filter/MultiCategoryFilterFragment.lua"] = function() return AGS.class.MultiCategoryFilterFragment ~= nil end,
+    ["frontend/filter/MultiButtonFilterFragment.lua"] = function() return AGS.class.MultiButtonFilterFragment ~= nil end,
+    ["frontend/filter/SortFilterFragment.lua"] = function() return AGS.class.SortFilterFragment ~= nil end,
+    ["wrappers/TradingHouseWrapper.lua"] = function() return AGS.class.TradingHouseWrapper ~= nil end,
+    ["wrappers/SearchTabWrapper.lua"] = function() return AGS.class.SearchTabWrapper ~= nil end,
+    ["wrappers/SellTabWrapper.lua"] = function() return AGS.class.SellTabWrapper ~= nil end,
+    ["wrappers/ListingTabWrapper.lua"] = function() return AGS.class.ListingTabWrapper ~= nil end,
+    ["wrappers/KeybindStripWrapper.lua"] = function() return AGS.class.KeybindStripWrapper ~= nil end,
+    ["guildstorelist/KioskData.lua"] = function() return AGS.class.KioskData ~= nil end,
+    ["guildstorelist/StoreData.lua"] = function() return AGS.class.StoreData ~= nil end,
+    ["guildstorelist/KioskList.lua"] = function() return AGS.class.KioskList ~= nil end,
+    ["guildstorelist/StoreList.lua"] = function() return AGS.class.StoreList ~= nil end,
+    ["guildstorelist/OwnerList.lua"] = function() return AGS.class.OwnerList ~= nil end,
+    ["guildstorelist/GuildStoreList.xml"] = function() return AGS.class.OwnerList ~= nil end,
+    ["guildstorelist/GuildList.xml"] = function() return AwesomeGuildStoreGuildTraders ~= nil end,
+    ["guildstorelist/TraderListControl.lua"] = function() return AGS.class.TraderListControl ~= nil end,
+    ["guildstorelist/GuildListControl.lua"] = function() return AGS.class.GuildListControl ~= nil end,
+    ["guildstorelist/OwnerHistoryControl.lua"] = function() return AGS.class.OwnerHistoryControl ~= nil end,
+    ["guildstorelist/KioskHistoryControl.lua"] = function() return AGS.class.KioskHistoryControl ~= nil end,
+    ["guildstorelist/GuildList.lua"] = function() return AGS.internal.InitializeGuildList ~= nil end,
+    ["guildstorelist/GuildStoreList.lua"] = function() return AGS.internal.InitializeGuildStoreList ~= nil end,
+    ["SalesCategorySelector.lua"] = function() return AGS.class.SalesCategorySelector ~= nil end,
+    ["AwesomeGuildStore.xml"] = function() return AwesomeGuildStoreXmlLoaded ~= nil end,
+-- "Bindings.xml", -- TODO: how to test?
+}
+
+local libraryCheckList = {
+    ["LibAddonMenu-2.0 r28"] = function() return LibAddonMenu2 ~= nil end,
+}
+
 local function IntegrityCheck()
-    assert(LibStub)
-    assert(LibStub("LibAddonMenu-2.0", true))
-    assert(LAMCreateControl.panel)
-    assert(LAMCreateControl.submenu)
-    assert(LAMCreateControl.button)
-    assert(LAMCreateControl.checkbox)
-    assert(LAMCreateControl.colorpicker)
-    assert(LAMCreateControl.custom)
-    assert(LAMCreateControl.description)
-    assert(LAMCreateControl.dropdown)
-    assert(LAMCreateControl.editbox)
-    assert(LAMCreateControl.header)
-    assert(LAMCreateControl.slider)
-    assert(LAMCreateControl.iconpicker)
-    assert(LAMCreateControl.divider)
-    assert(LibStub("LibFilters-2.0", true))
-    assert(LibStub("libCommonInventoryFilters", true))
-    assert(LibStub("LibTextFilter", true))
-    assert(LibStub("LibCustomMenu", true))
-    assert(LibStub("LibMapPing", true))
-    assert(LibStub("LibGPS2", true))
-    assert(LibStub("LibDateTime", true))
-    assert(LibStub("LibPromises", true))
-    assert(LibStub("LibGetText", true))
-    assert(AwesomeGuildStore.LoadSettings)
-    assert(AwesomeGuildStore.IsUnitGuildKiosk)
-    assert(AwesomeGuildStore.MinMaxRangeSlider)
-    assert(AwesomeGuildStore.ButtonGroup)
-    assert(AwesomeGuildStore.ToggleButton)
-    assert(AwesomeGuildStore.SimpleIconButton)
-    assert(AwesomeGuildStore.LoadingIcon)
-    assert(AwesomeGuildStore.FilterBase)
-    assert(AwesomeGuildStore.FILTER_PRESETS)
-    assert(AwesomeGuildStore.CategorySubfilter)
-    assert(AwesomeGuildStore.KnownRecipeFilter)
-    assert(AwesomeGuildStore.KnownMotifFilter)
-    assert(AwesomeGuildStore.KnownRuneTranslationFilter)
-    assert(AwesomeGuildStore.ResearchableTraitsFilter)
-    assert(AwesomeGuildStore.ItemStyleFilter)
-    assert(AwesomeGuildStore.ItemSetFilter)
-    assert(AwesomeGuildStore.CraftedItemFilter)
-    assert(AwesomeGuildStore.CategorySelector)
-    assert(AwesomeGuildStore.PriceFilter)
-    assert(AwesomeGuildStore.LevelFilter)
-    assert(AwesomeGuildStore.QualityFilter)
-    assert(AwesomeGuildStore.TextFilter)
-    assert(AwesomeGuildStore.UnitPriceFilter)
-    assert(AwesomeGuildStore.RecipeImprovementFilter)
-    assert(AwesomeGuildStore.SavedSearchTooltip)
-    assert(AwesomeGuildStore.SearchLibrary)
-    assert(AwesomeGuildStoreSearchLibrary)
-    assert(AwesomeGuildStore.InitializeAugmentedMails)
-    assert(AwesomeGuildStore.HiredTraderTooltip)
-    assert(AwesomeGuildStore.GuildSelector)
-    assert(AwesomeGuildStore.Paging)
-    assert(AwesomeGuildStore.ActivityBase)
-    assert(AwesomeGuildStore.CancelSaleOperation)
-    assert(AwesomeGuildStore.RequestListingsOperation)
-    assert(AwesomeGuildStore.ExecuteSearchOperation)
-    assert(AwesomeGuildStore.SwitchGuildOperation)
-    assert(AwesomeGuildStore.ActivityManager)
-    assert(AwesomeGuildStore.TradingHouseWrapper)
-    assert(AwesomeGuildStore.SearchTabWrapper)
-    assert(AwesomeGuildStore.SellTabWrapper)
-    assert(AwesomeGuildStore.ListingTabWrapper)
-    assert(AwesomeGuildStore.KeybindStripWrapper)
-    assert(AwesomeGuildStore.ActivityLogWrapper)
-    assert(AwesomeGuildStore.KioskData)
-    assert(AwesomeGuildStore.StoreData)
-    assert(AwesomeGuildStore.KioskList)
-    assert(AwesomeGuildStore.StoreList)
-    assert(AwesomeGuildStore.OwnerList)
-    assert(AwesomeGuildStoreGuildTraders)
-    assert(AwesomeGuildStoreGuilds)
-    assert(AwesomeGuildStore.TraderListControl)
-    assert(AwesomeGuildStore.GuildListControl)
-    assert(AwesomeGuildStore.OwnerHistoryControl)
-    assert(AwesomeGuildStore.KioskHistoryControl)
-    assert(AwesomeGuildStore.InitializeGuildList)
-    assert(AwesomeGuildStore.InitializeGuildStoreList)
-    assert(AwesomeGuildStore.SalesCategorySelector)
-end
-
-do
-    -- workaround for insecure code errors due to the ZO_ItemSlotActionsController being lazily instantiated
-    HUD_SCENE:AddFragment(INVENTORY_FRAGMENT)
-    HUD_UI_SCENE:AddFragment(INVENTORY_FRAGMENT)
-
-    local original = ZO_CharacterWindowStats_HideComparisonValues
-    ZO_CharacterWindowStats_HideComparisonValues = ZO_InventorySlot_RemoveMouseOverKeybinds -- force the controller to be instantiated
-    ZO_PreHook("ZO_CharacterWindowStats_HideComparisonValues", function()
-        ZO_CharacterWindowStats_HideComparisonValues = original
-    end)
-
-    -- and clean up afterwards
-    local function OnStateChange(oldState, newState)
-        if newState == SCENE_SHOWN then
-            INVENTORY_FRAGMENT.control:SetHidden(true) -- make sure it doesn't show up
-            HUD_UI_SCENE:RemoveFragment(INVENTORY_FRAGMENT)
-            HUD_SCENE:RemoveFragment(INVENTORY_FRAGMENT)
-            HUD_UI_SCENE:UnregisterCallback("StateChange", OnStateChange)
-            HUD_SCENE:UnregisterCallback("StateChange", OnStateChange)
+    for fileName, check in pairs(integrityCheckList) do
+        if(not check()) then
+            -- TRANSLATORS: Chat message when the addon was not installed correctly and some files are missing. Placeholder is for the filename.
+            local message = AGS.internal.gettext("The file '<<1>>' is missing. Please reinstall AwesomeGuildStore.", fileName)
+            AGS.internal.Print(message)
+            return false
         end
     end
-    HUD_UI_SCENE:RegisterCallback("StateChange", OnStateChange)
-    HUD_SCENE:RegisterCallback("StateChange", OnStateChange)
+    for libName, check in pairs(libraryCheckList) do
+        if(not check()) then
+            -- TRANSLATORS: Chat message when a dependency does not fulfill the minimal version requirement. Placeholder is for the required library name and version.
+            local message = AGS.internal.gettext("Cannot start due to an outdated library. Please install <<1>> or newer.", libName)
+            AGS.internal.Print(message)
+            return false
+        end
+    end
+    return true
 end
 
 OnAddonLoaded(function()
-    IntegrityCheck()
+    if(not IntegrityCheck()) then return end
 
-    local saveData = AwesomeGuildStore.LoadSettings()
-    AwesomeGuildStore.SetMessagePrefix(saveData.shortMessagePrefix)
+    local saveData = AGS.internal.LoadSettings()
     if(saveData.guildTraderListEnabled) then
-        AwesomeGuildStore.InitializeGuildStoreList(saveData)
+        AGS.internal.InitializeGuildStoreList(saveData)
     end
-    AwesomeGuildStore.main = AwesomeGuildStore.TradingHouseWrapper:New(saveData)
-    AwesomeGuildStore.InitializeAugmentedMails(saveData)
+    AGS.internal.tradingHouse = AGS.class.TradingHouseWrapper:New(saveData)
+    AGS.internal.InitializeAugmentedMails(saveData)
 
-    local gettext = LibStub("LibGetText")("AwesomeGuildStore").gettext
+    local gettext = AGS.internal.gettext
 
     local actionName, defaultKey = "AGS_SUPPRESS_LOCAL_FILTERS", KEY_CTRL
     -- TRANSLATORS: keybind label in the controls menu
@@ -260,5 +253,9 @@ OnAddonLoaded(function()
 
     if(not saveData.hasTouchedAction["AGS_SUPPRESS_LOCAL_FILTERS"]) then
         CreateDefaultActionBind(actionName, defaultKey)
+    end
+
+    if(LibCIF and not saveData.disableCustomSellTabFilter) then
+        LibCIF:disableGuildStoreSellFilters()
     end
 end)
