@@ -13,8 +13,6 @@
 ##
 ## You can read the full terms at https://account.elderscrollsonline.com/add-on-terms
 
-lib/LibStub/LibStub.lua
-lib/LibCustomTitles/LibCustomTitles.lua
 StartUp.lua
 API.lua
 CallbackNames.lua
