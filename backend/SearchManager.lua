@@ -5,7 +5,6 @@ local RegisterForEvent = AGS.internal.RegisterForEvent
 
 local ActivityBase = AGS.class.ActivityBase
 local SearchState = AGS.class.SearchState
-local ClearCallLater = AGS.internal.ClearCallLater
 
 local FILTER_UPDATE_DELAY = 0 -- TODO do we even need this? check with profiler
 local AUTO_SEARCH_RESULT_COUNT_THRESHOLD = 20
@@ -48,12 +47,14 @@ function SearchManager:Initialize(tradingHouseWrapper, saveData)
     end
 
     ZO_PreHook(self.search, "LoadSearchItem", function(_, itemLink)
-        local search = self:AddSearch()
+        self.isChangingFromSearchItem = true
+        local search = self:GetOrCreateAutomaticSearch()
         search:SetLabel(zo_strformat(SI_TOOLTIP_ITEM_NAME, GetItemLinkName(itemLink)))
         self:SetActiveSearch(search)
         for id, filter in pairs(self.availableFilters) do
             filter:SetFromItem(itemLink)
         end
+        self.isChangingFromSearchItem = nil
         return true
     end)
 
@@ -134,7 +135,7 @@ function SearchManager:OnFiltersInitialized()
         self.searches[i] = SearchState:New(self, saveData.searches[i])
     end
     if(#self.searches == 0) then
-        self:AddSearch()
+        self:GetOrCreateAutomaticSearch()
     end
     if(not saveData.activeIndex or not self.searches[saveData.activeIndex]) then
         saveData.activeIndex = 1
@@ -147,7 +148,7 @@ function SearchManager:OnFiltersInitialized()
         if(filter == self.categoryFilter) then
             self:UpdateAttachedFilters(SILENT)
         end
-        self.activeSearch:HandleFilterChanged(self.availableFilters[id])
+        self.activeSearch:HandleFilterChanged(self.availableFilters[id], self.isChangingFromSearchItem)
         self:RequestFilterUpdate()
     end)
 
@@ -248,12 +249,34 @@ function SearchManager:GetSearches()
 end
 
 function SearchManager:AddSearch(saveData)
+    local search = self:CreateSearch(saveData)
+    AGS.internal:FireCallbacks(AGS.callback.SEARCH_LIST_CHANGED, REQUIRES_FULL_UPDATE)
+    return search
+end
+
+function SearchManager:CreateSearch(saveData)
     local search = SearchState:New(self, saveData)
     local newIndex = #self.searches + 1
     search.sortIndex = newIndex -- this is so we do not have to refresh the list twice
     self.searches[newIndex] = search
     self.saveData.searches[newIndex] = search:GetSaveData()
+    return search
+end
 
+function SearchManager:GetOrCreateAutomaticSearch()
+    for i = 1, #self.searches do
+        local search = self.searches[i]
+        if search:IsAutomatic() then
+            logger:Debug("Found automatic search to reuse")
+            search:Reset()
+            search:SetAutomatic(true)
+            return search
+        end
+    end
+
+    logger:Debug("Create new automatic search")
+    local search = self:CreateSearch()
+    search:SetAutomatic(true)
     AGS.internal:FireCallbacks(AGS.callback.SEARCH_LIST_CHANGED, REQUIRES_FULL_UPDATE)
     return search
 end
@@ -268,7 +291,7 @@ function SearchManager:RemoveSearch(search)
     if(self.activeSearch == search) then
         local activeSearch
         if(#self.searches == 0) then
-            activeSearch = self:AddSearch()
+            activeSearch = self:GetOrCreateAutomaticSearch()
             self.saveData.activeIndex = 1
         else
             local index = math.min(index, #searches)
@@ -327,7 +350,7 @@ end
 
 function SearchManager:RequestResultUpdate()
     if(self.resultUpdateCallback) then -- TODO use the delay call lib we started but never finished
-        ClearCallLater(self.resultUpdateCallback)
+        zo_removeCallLater(self.resultUpdateCallback)
     end
     self.resultUpdateCallback = zo_callLater(function()
         self.resultUpdateCallback = nil
@@ -337,7 +360,7 @@ end
 
 function SearchManager:RequestFilterUpdate()
     if(self.updateCallback) then -- TODO use the delay call lib we started but never finished
-        ClearCallLater(self.updateCallback)
+        zo_removeCallLater(self.updateCallback)
     end
     self.updateCallback = zo_callLater(function()
         self.updateCallback = nil
@@ -380,7 +403,7 @@ function SearchManager:RequestSearch(ignoreResultCount)
         if(self:HasCurrentSearchMorePages(guildId)) then
             if(self.activityManager:RequestSearchResults(guildId, ignoreResultCount)) then
                 if(self.requestNewestInterval) then
-                    ClearCallLater(self.requestNewestInterval)
+                    zo_removeCallLater(self.requestNewestInterval)
                 end
 
                 logger:Debug("Queued request search results")
@@ -397,7 +420,7 @@ end
 
 function SearchManager:RequestNewest(ignoreCooldown)
     if(self.requestNewestInterval) then
-        ClearCallLater(self.requestNewestInterval)
+        zo_removeCallLater(self.requestNewestInterval)
     end
 
     local guildId = GetSelectedTradingHouseGuildId()

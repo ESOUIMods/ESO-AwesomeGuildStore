@@ -1,9 +1,5 @@
 local AGS = AwesomeGuildStore
 
-local IsUnitGuildKiosk = AGS.internal.IsUnitGuildKiosk
-local IsLocationVisible = AGS.internal.IsLocationVisible
-local IsCurrentMapZoneMap = AGS.internal.IsCurrentMapZoneMap
-local RegisterForEvent = AGS.internal.RegisterForEvent
 local ShowGuildDetails = AGS.internal.ShowGuildDetails
 local gettext = AGS.internal.gettext
 local osdate = os.date
@@ -213,6 +209,7 @@ local function InitializeGuildList(saveData, kioskList, storeList, ownerList)
     end
 
     local function RefreshTraderList()
+        AGS.internal.logger:Debug("RefreshTraderList - Guilds")
         guildList:RefreshData()
         if(not selectedTraderData) then
             local data = guildList:GetFirstGuildEntryInList()

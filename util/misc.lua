@@ -25,16 +25,6 @@ end
 AGS.internal.GetUnitGuildKioskOwnerInfo = GetUnitGuildKioskOwnerInfo
 
 
-local function IsLocationVisible(locationIndex)
-    if(not IsMapLocationVisible(locationIndex)) then return false end
-    local _, x, y = GetMapLocationIcon(locationIndex)
-    if(x < 0 or x > 1 or y < 0 or y > 1) then return false end
-    return true
-end
-
-AGS.internal.IsLocationVisible = IsLocationVisible
-
-
 local function IsCurrentMapZoneMap()
     return GetMapType() == MAPTYPE_ZONE and GetMapContentType() ~= MAP_CONTENT_DUNGEON
 end
@@ -60,13 +50,6 @@ local function GetKioskNameFromInfoText(infoText)
 end
 
 AGS.internal.GetKioskNameFromInfoText = GetKioskNameFromInfoText
-
-
-local function ClearCallLater(id)
-    EVENT_MANAGER:UnregisterForUpdate("CallLaterFunction"..id)
-end
-
-AGS.internal.ClearCallLater = ClearCallLater
 
 
 local function GetItemLinkWritCount(itemLink)

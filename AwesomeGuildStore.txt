@@ -1,10 +1,10 @@
 ## Title: AwesomeGuildStore
 ## Author: sirinsidiator
-## Version: 1.3.1-beta
-## APIVersion: 100030
-## AddOnVersion: 2496
-## DependsOn: LibCustomMenu>=680 LibDebugLogger>=126 LibDateTime>=8 LibAddonMenu-2.0>=29 LibMapPing>=900 LibGPS>=17 LibPromises>=10 LibTextFilter>=10 LibGetText>=10 libCommonInventoryFilters>=131 LibRunebox>=2 LibChatMessage>=87
-## OptionalDependsOn: LibStub>=6 LibFilters-3.0>=312 LibCustomTitles LibAnnyoingUpdateNotificationInGame CraftedPotions>=20
+## Version: 1.4.0-beta
+## APIVersion: 100031
+## AddOnVersion: 2606
+## DependsOn: LibCustomMenu>=680 LibDebugLogger>=126 LibDateTime>=8 LibAddonMenu-2.0>=31 LibMapPing>=900 LibGPS>=17 LibPromises>=10 LibTextFilter>=10 LibGetText>=10 libCommonInventoryFilters>=131 LibRunebox>=2 LibChatMessage>=87
+## OptionalDependsOn: LibFilters-3.0>=312 LibCustomTitles LibAnnyoingUpdateNotificationInGame CraftedPotions>=20
 ## SavedVariables: AwesomeGuildStore_Data
 ##
 ## This Add-on is not created by, affiliated with or sponsored by ZeniMax Media Inc. or its affiliates. 
@@ -136,6 +136,7 @@ guildstorelist/StoreData.lua
 guildstorelist/KioskList.lua
 guildstorelist/StoreList.lua
 guildstorelist/OwnerList.lua
+guildstorelist/StoreLocationHelper.lua
 guildstorelist/GuildStoreList.xml
 guildstorelist/GuildList.xml
 guildstorelist/TraderListControl.lua

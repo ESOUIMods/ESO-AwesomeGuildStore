@@ -3,7 +3,6 @@ local AGS = AwesomeGuildStore
 local gettext = AGS.internal.gettext
 local RegisterForEvent = AGS.internal.RegisterForEvent
 local ToggleButton = AGS.class.ToggleButton
-local ClearCallLater = AGS.internal.ClearCallLater
 local GetItemLinkWritCount = AGS.internal.GetItemLinkWritCount
 local chat = AGS.internal.chat
 local logger = AGS.internal.logger
@@ -322,6 +321,10 @@ function SearchTabWrapper:InitializePurchase(tradingHouseWrapper)
             self:PrintPurchaseMessageForEntry(itemData)
         end
         itemData.purchased = true
+        self.searchResultList:RefreshVisible()
+    end)
+
+    AGS:RegisterCallback(AGS.callback.ITEM_PURCHASE_FAILED, function(itemData)
         self.searchResultList:RefreshVisible()
     end)
 
