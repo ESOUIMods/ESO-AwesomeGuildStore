@@ -1,14 +1,14 @@
 ## Title: AwesomeGuildStore
 ## Author: sirinsidiator
-## Version: 1.4.0-beta
-## APIVersion: 100031
-## AddOnVersion: 2606
-## DependsOn: LibCustomMenu>=680 LibDebugLogger>=126 LibDateTime>=8 LibAddonMenu-2.0>=31 LibMapPing>=900 LibGPS>=17 LibPromises>=10 LibTextFilter>=10 LibGetText>=10 libCommonInventoryFilters>=131 LibRunebox>=2 LibChatMessage>=87
+## Version: 1.4.1-beta
+## APIVersion: 100031 100032
+## AddOnVersion: 2614
+## DependsOn: LibCustomMenu>=680 LibDebugLogger>=126 LibDateTime>=8 LibAddonMenu-2.0>=31 LibMapPing>=900 LibGPS>=17 LibPromises>=10 LibTextFilter>=10 LibGetText>=10 libCommonInventoryFilters>=131 LibChatMessage>=87
 ## OptionalDependsOn: LibFilters-3.0>=312 LibCustomTitles LibAnnyoingUpdateNotificationInGame CraftedPotions>=20
 ## SavedVariables: AwesomeGuildStore_Data
 ##
-## This Add-on is not created by, affiliated with or sponsored by ZeniMax Media Inc. or its affiliates. 
-## The Elder Scrolls® and related logos are registered trademarks or trademarks of ZeniMax Media Inc. in the United States and/or other countries. 
+## This Add-on is not created by, affiliated with or sponsored by ZeniMax Media Inc. or its affiliates.
+## The Elder Scrolls® and related logos are registered trademarks or trademarks of ZeniMax Media Inc. in the United States and/or other countries.
 ## All rights reserved
 ##
 ## You can read the full terms at https://account.elderscrollsonline.com/add-on-terms
