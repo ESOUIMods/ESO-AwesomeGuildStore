@@ -1,9 +1,9 @@
 ## Title: AwesomeGuildStore
 ## Author: sirinsidiator
-## Version: 1.4.3-beta
-## APIVersion: 100032 100033
-## AddOnVersion: 2627
-## DependsOn: LibCustomMenu>=680 LibDebugLogger>=126 LibDateTime>=8 LibAddonMenu-2.0>=31 LibMapPing>=900 LibGPS>=17 LibPromises>=10 LibTextFilter>=10 LibGetText>=10 libCommonInventoryFilters>=131 LibChatMessage>=87
+## Version: 1.4.4-beta
+## APIVersion: 100033
+## AddOnVersion: 2635
+## DependsOn: LibCustomMenu>=680 LibDebugLogger>=126 LibDateTime>=8 LibAddonMenu-2.0>=31 LibMapPing>=900 LibGPS>=17 LibPromises>=10 LibTextFilter>=10 LibGetText>=10 LibChatMessage>=87
 ## OptionalDependsOn: LibFilters-3.0>=312 LibCustomTitles LibAnnyoingUpdateNotificationInGame CraftedPotions>=20
 ## SavedVariables: AwesomeGuildStore_Data
 ##
@@ -145,6 +145,5 @@ guildstorelist/OwnerHistoryControl.lua
 guildstorelist/KioskHistoryControl.lua
 guildstorelist/GuildList.lua
 guildstorelist/GuildStoreList.lua
-SalesCategorySelector.lua
 AwesomeGuildStore.xml
 Bindings.xml
